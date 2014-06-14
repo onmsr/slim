@@ -157,8 +157,20 @@ BOOL lmn_sameproccxt_all_pc_check_original(SameProcCxt *spc, LmnSAtom atom, int 
 BOOL lmn_sameproccxt_all_pc_check_clone(SameProcCxt *spc, LmnSAtom atom, int atom_arity);
 void lmn_hyperlink_get_elements(Vector *tree, HyperLink *start_hl);
 
+// ハイパーリンクハッシュ値関連 @onuma
+#define HLHASH_DEPTH 2
+unsigned long lmn_hlhash(HyperLink *hl);
+unsigned long lmn_hlhash_sub(LmnWord atom);
+unsigned long lmn_hlhash_depth(HyperLink *hl,int depth);
+void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned long *sum, int depth);
+
+
 /* ハイパーリンクhlのハッシュ値を返す. */
 static inline unsigned long lmn_hyperlink_hash(HyperLink *hl) {
+  if(lmn_env.hlhash){  // ハイパーリンクのハッシュ値計算改良版
+    return lmn_hlhash_depth(hl, HLHASH_DEPTH);
+    // return lmn_hlhash(hl);
+  }
   return lmn_hyperlink_element_num(hl);
 }
 

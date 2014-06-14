@@ -209,6 +209,7 @@ static void parse_options(int *optid, int argc, char *argv[])
     {"debug-por"              , 0, 0, 6012},
     {"show-rgraph"            , 0, 0, 6013},
     {"debug-tr-dep"           , 0, 0, 6014},
+    {"hlhash"                 , 0, 0, 6015},
     {"prof-nomemeq"           , 0, 0, 6050},
     {"visualize"              , 0, 0, 6100},
     {"hash-compaction"        , 0, 0, 6060},
@@ -498,6 +499,9 @@ static void parse_options(int *optid, int argc, char *argv[])
     case 6014:
       lmn_env.debug_por_dep = TRUE;
       lmn_env.enable_por = TRUE;
+      break;
+    case 6015:
+      lmn_env.hlhash = TRUE;
       break;
 #else
     case 6007:

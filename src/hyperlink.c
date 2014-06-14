@@ -1062,3 +1062,142 @@ void lmn_hyperlink_get_elements(Vector *tree, HyperLink *start_hl)
   if (root != start_hl) vec_push(tree, (LmnWord)root);
   vec_push(tree, (LmnWord)start_hl);
 }
+
+
+/* --------------------------------------------------------------- *
+ *  ハイパーリンクハッシュ値計算                                     *
+ *  '!'アトムに接続されたアトムを深さDまでたどり計算する               *
+ * -------------------------------------------------------------- */
+
+/* ハイパーリンクhlのハッシュ値を計算する */
+unsigned long lmn_hlhash(HyperLink *hl) {
+
+  unsigned long sum = 0;
+  HashSetIterator hsit;
+  HyperLink *ch_hl;
+  HashSet *children;
+  HyperLink *hl_root = lmn_hyperlink_get_root(hl);
+  LmnAtom at = (LmnAtom) lmn_hyperlink_hl_to_at(hl_root);
+  if (!LMN_ATTR_IS_DATA(LMN_SATOM_GET_ATTR(at, 0)) && LMN_SATOM_GET_LINK(at, 0)) {
+    sum +=  lmn_hlhash_sub(LMN_SATOM_GET_LINK(at, 0));
+  }
+  if((children = hl_root->children)){
+    for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
+      if ((HashKeyType)(ch_hl = (HyperLink *)hashsetiter_entry(&hsit)) < DELETED_KEY) {
+        at = (LmnAtom) lmn_hyperlink_hl_to_at(ch_hl);
+        if (!LMN_ATTR_IS_DATA(LMN_SATOM_GET_ATTR(at, 0)) && LMN_SATOM_GET_LINK(at, 0)) {
+          sum +=  lmn_hlhash_sub(LMN_SATOM_GET_LINK(at, 0));
+        }
+      }
+    }
+  }
+  return sum;
+}
+
+unsigned long lmn_hlhash_sub(LmnWord atom) {
+
+  unsigned long sum = 0;
+
+  if (LMN_IS_SYMBOL_FUNCTOR(LMN_SATOM_GET_FUNCTOR(atom))) {
+    const int arity = LMN_SATOM_GET_ARITY(atom);
+    int i_arg;
+    LmnLinkAttr attr;
+    for (i_arg = 0; i_arg < arity; i_arg++) {
+      
+      attr = LMN_SATOM_GET_ATTR(atom,i_arg);
+      if (!LMN_ATTR_IS_DATA(attr)) {
+        LmnAtom at = LMN_SATOM_GET_LINK(atom, i_arg);
+        if (at) {
+          sum += LMN_SATOM_GET_FUNCTOR(at);
+        }
+      }else{
+        switch (attr) {
+        case  LMN_INT_ATTR:
+          sum += LMN_SATOM_GET_LINK(atom,i_arg);
+          break;
+        case  LMN_DBL_ATTR:
+          sum += (int) (*(double*)LMN_SATOM_GET_LINK(atom,i_arg));
+          break;
+        case  LMN_HL_ATTR:
+          sum += lmn_hyperlink_element_num(lmn_hyperlink_at_to_hl((LmnSAtom) LMN_SATOM_GET_LINK(atom, i_arg)));	   
+          break;
+        default:
+          break;
+        }
+      }
+      
+    }
+  }
+
+  return sum;
+}
+
+/* ハイパーリンクhlのハッシュ値を計算する(深さ指定版) */
+unsigned long lmn_hlhash_depth(HyperLink *hl, int depth) {
+
+  unsigned long sum = 0;
+  HashSetIterator hsit;
+  HyperLink *ch_hl;
+  HashSet *children;
+  LmnLinkAttr attr;
+  HyperLink *hl_root = lmn_hyperlink_get_root(hl);
+  LmnAtom at = (LmnAtom) lmn_hyperlink_hl_to_at(hl_root);
+  attr = LMN_SATOM_GET_ATTR(at, 0);
+  if (!LMN_ATTR_IS_DATA(attr) && LMN_SATOM_GET_LINK(at, 0)) {
+    lmn_hlhash_depth_sub(LMN_SATOM_GET_LINK(at, 0), attr, -1 , &sum, depth);
+  }
+  if((children = hl_root->children)){
+    for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
+      if ((HashKeyType)(ch_hl = (HyperLink *)hashsetiter_entry(&hsit)) < DELETED_KEY) {
+        at = (LmnAtom) lmn_hyperlink_hl_to_at(ch_hl);
+        attr = LMN_SATOM_GET_ATTR(at, 0);
+        if (!LMN_ATTR_IS_DATA(attr) && LMN_SATOM_GET_LINK(at, 0)) {
+          lmn_hlhash_depth_sub(LMN_SATOM_GET_LINK(at, 0), attr, -1 , &sum, depth);
+        }
+      }
+    }
+  }
+  return sum;
+}
+
+void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned long *sum, int depth)
+{
+  unsigned long unit = 0;
+  if (!LMN_ATTR_IS_DATA(attr)) { // symbol
+    LmnFunctor f = LMN_SATOM_GET_FUNCTOR(atom);
+    unit = (unsigned long) f;
+
+    if (depth > 1) {
+      if (LMN_IS_SYMBOL_FUNCTOR(f)) {
+        const int arity = LMN_SATOM_GET_ARITY(atom);
+        int i_arg;
+
+        for (i_arg = 0; i_arg < arity; i_arg++) {
+          if (i_arg == i_parent) continue;
+          
+          LmnLinkAttr to_attr = LMN_SATOM_GET_ATTR(atom, i_arg);
+          LmnAtom to_atom = LMN_SATOM_GET_LINK(atom, i_arg);
+          lmn_hlhash_depth_sub(to_atom, to_attr, LMN_ATTR_GET_VALUE(to_attr), sum, depth-1);
+        }
+      }
+    }
+
+  }else{ // data    
+    switch (attr) {
+    case  LMN_INT_ATTR: // int
+      unit = ((unsigned long) atom) + 1;
+      break;
+    case  LMN_DBL_ATTR: // double
+      unit += (unsigned long) (*(double*) atom);
+      /* unit = (unsigned long) lmn_byte_hash((unsigned char *)atom, sizeof(double) / sizeof(unsigned char)); */
+      break;
+    case  LMN_HL_ATTR: // hyperlink
+      unit = lmn_hyperlink_element_num(lmn_hyperlink_at_to_hl((LmnSAtom) atom));
+      break;
+    default:
+      break;
+    }    
+  }
+  (*sum) += unit;
+}
+
