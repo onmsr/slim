@@ -1230,3 +1230,35 @@ void lmn_dump_atom(LmnPort port, LmnWord atom, LmnLinkAttr attr)
   dump_atom(port, atom, &ht, attr, &s, 0);
   atomrec_tbl_destroy(&ht);
 }
+
+/* for debug @onuma */
+char *get_functor_name(int functor_id)
+{
+  char *functor_array[22] = {
+    "LMN_IN_PROXY_FUNCTOR",
+    "LMN_OUT_PROXY_FUNCTOR",
+    "LMN_STAR_PROXY_FUNCTOR",
+    "LMN_UNIFY_FUNCTOR",
+    "LMN_LIST_FUNCTOR",
+    "LMN_NIL_FUNCTOR",
+    "LMN_RESUME_FUNCTOR",
+    "LMN_ARITHMETIC_IADD_FUNCTOR",
+    "LMN_ARITHMETIC_ISUB_FUNCTOR",
+    "LMN_ARITHMETIC_IMUL_FUNCTOR",
+    "LMN_ARITHMETIC_IDIV_FUNCTOR",
+    "LMN_ARITHMETIC_MOD_FUNCTOR",
+    "LMN_ARITHMETIC_FADD_FUNCTOR",
+    "LMN_ARITHMETIC_FSUB_FUNCTOR",
+    "LMN_ARITHMETIC_FMUL_FUNCTOR",
+    "LMN_ARITHMETIC_FDIV_FUNCTOR",
+    "LMN_UNARY_PLUS_FUNCTOR",
+    "LMN_UNARY_MINUS_FUNCTOR",
+    "LMN_MEM_EQ_FUNCTOR",
+    "LMN_TRUE_FUNCTOR",
+    "LMN_FALSE_FUNCTOR",
+    "LMN_EXCLAMATION_FUNCTOR"
+  };
+
+  if(functor_id > 22) return "out of 22";
+  return functor_array[functor_id];
+}

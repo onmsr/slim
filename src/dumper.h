@@ -54,6 +54,7 @@ LMN_EXTERN void lmn_dump_dot(LmnMembrane *mem);
 LMN_EXTERN void lmn_dump_rule(LmnPort port, LmnRuleSet rs);
 LMN_EXTERN void lmn_dump_ruleset(LmnPort port, Vector *v);
 LMN_EXTERN void lmn_dump_atom(LmnPort port, LmnWord atom, LmnLinkAttr attr);
+LMN_EXTERN char *get_functor_name(int functor_id);
 
 void dump_escaped(LmnPort port, const char *s);
 

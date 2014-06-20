@@ -181,14 +181,11 @@ int lmn_get_atom_link_num(LmnSAtom srcAt,LmnSAtom destAt);
 void lmn_hyperlink_delete_from_mem(HyperLink *hl);
 void lmn_hyperlink_delete_all(HyperLink *hl);
 unsigned long get_max_id(LmnMembrane *mem);
-void lmn_init_hyperlink_root(LmnMembrane *gr);
 
 #define LMN_HYPERLINK_MEM 444
 #define LMN_HLMEM_ATOM_FUNCTOR 16
 #define HYPERMEM 1
 
-// dump @onuma
-char *get_functor_name(int functor_id);
 void lmn_link_test(LmnMembrane *gr);
 
 

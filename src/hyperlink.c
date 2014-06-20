@@ -1209,8 +1209,6 @@ void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned
 /* ハイパーリンクを膜に変換する関数 (ハイパーリンク->膜) */
 void lmn_convert_hl_to_mem_root(LmnMembrane *gr)
 {
-  /* lmn_init_hyperlink_root(gr); */
-
   // 引数のグローバルルート膜を始点にして、全膜内のハイパーリンクアトム探索
   // ハイパーリンクに出会ったときに変換
   AtomListEntry *ent;
@@ -1588,54 +1586,6 @@ unsigned long get_max_id(LmnMembrane *mem)
   return maxid;
 }
 
-void lmn_init_hyperlink_root(LmnMembrane *gr)
-{
-  AtomListEntry *ent = lmn_mem_get_atomlist(gr, LMN_HL_FUNC);
-  if(ent){
-    LmnSAtom atom;
-    EACH_ATOM(atom, ent, ({
-	  unsigned int i;
-	  LmnArity arity = LMN_FUNCTOR_ARITY(LMN_SATOM_GET_FUNCTOR(atom));
-	  for (i = 0; i < arity; i++) {
-	    if (i == 1 && LMN_FUNC_IS_HL(LMN_SATOM_GET_FUNCTOR(atom))) {
-	      lmn_hyperlink_get_root(((HyperLink *) LMN_SATOM_GET_LINK(atom, i)));
-	    }
-	  }
-	}));
-  }
-}
-
-/* for debug @onuma */
-char *get_functor_name(int functor_id)
-{
-  char *functor_array[22] = {
-    "LMN_IN_PROXY_FUNCTOR",
-    "LMN_OUT_PROXY_FUNCTOR",
-    "LMN_STAR_PROXY_FUNCTOR",
-    "LMN_UNIFY_FUNCTOR",
-    "LMN_LIST_FUNCTOR",
-    "LMN_NIL_FUNCTOR",
-    "LMN_RESUME_FUNCTOR",
-    "LMN_ARITHMETIC_IADD_FUNCTOR",
-    "LMN_ARITHMETIC_ISUB_FUNCTOR",
-    "LMN_ARITHMETIC_IMUL_FUNCTOR",
-    "LMN_ARITHMETIC_IDIV_FUNCTOR",
-    "LMN_ARITHMETIC_MOD_FUNCTOR",
-    "LMN_ARITHMETIC_FADD_FUNCTOR",
-    "LMN_ARITHMETIC_FSUB_FUNCTOR",
-    "LMN_ARITHMETIC_FMUL_FUNCTOR",
-    "LMN_ARITHMETIC_FDIV_FUNCTOR",
-    "LMN_UNARY_PLUS_FUNCTOR",
-    "LMN_UNARY_MINUS_FUNCTOR",
-    "LMN_MEM_EQ_FUNCTOR",
-    "LMN_TRUE_FUNCTOR",
-    "LMN_FALSE_FUNCTOR",
-    "LMN_EXCLAMATION_FUNCTOR"
-  };
-
-  if(functor_id > 22) return "out of 22";
-  return functor_array[functor_id];
-}
 
 /* リンクテスト for debug @onuma */
 /* 以下LMNtalプログラムの構造に適用 */
