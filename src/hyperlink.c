@@ -1215,20 +1215,21 @@ void lmn_convert_hl_to_mem_root(LmnMembrane *gr)
   // ハイパーリンクに出会ったときに変換
   AtomListEntry *ent;
   LmnSAtom atom;
-  while(ent = lmn_mem_get_atomlist(gr, LMN_HL_FUNC)){
+  do {
+    ent = lmn_mem_get_atomlist(gr, LMN_HL_FUNC);
     if(!ent || ( atomlist_head(ent) == lmn_atomlist_end(ent) )) break;
 
     EACH_ATOM(atom, ent, ({
           lmn_convert_hl_to_mem_sub(gr, gr, lmn_hyperlink_at_to_hl(atom));
           break;
         }));
-  }
+  } while (ent);
 
   // 子の膜について再帰する
   LmnMembrane *m;
   for(m = gr->child_head; m; m = m->next){
     if(LMN_MEM_ATTR(m) != LMN_HYPERLINK_MEM){    // ハイパーリンク膜以外
-      lmn_convert_hl_to_mem(gr,m);
+      lmn_convert_hl_to_mem(gr, m);
     }
   }
 }
@@ -1238,18 +1239,19 @@ void lmn_convert_hl_to_mem(LmnMembrane *gr, LmnMembrane *mem)
 {
   AtomListEntry *ent;
   LmnSAtom atom;
-  while(ent = lmn_mem_get_atomlist(mem, LMN_HL_FUNC)){
+  do {
+    ent = lmn_mem_get_atomlist(mem, LMN_HL_FUNC);
     if(!ent || ( atomlist_head(ent) == lmn_atomlist_end(ent) )) break;
     EACH_ATOM(atom, ent, ({
           lmn_convert_hl_to_mem_sub(gr, mem, lmn_hyperlink_at_to_hl(atom));
           break;
         }));
-  }
+  } while (ent);
 
   LmnMembrane *m;
   for(m = mem->child_head; m; m = m->next){
     if(LMN_MEM_ATTR(m) != LMN_HYPERLINK_MEM){    // ハイパーリンク膜以外
-      lmn_convert_hl_to_mem(gr,m);
+      lmn_convert_hl_to_mem(gr, m);
     }
   }
 }
@@ -1280,8 +1282,8 @@ void lmn_convert_hl_to_mem_sub(LmnMembrane *gr, LmnMembrane *mem, HyperLink *hl)
   if(children){
     HashSetIterator hsit;
     for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
-      if (tmp_hl = (HyperLink *) hashsetiter_entry(&hsit)) {
-        if (((HashKeyType) tmp_hl) < DELETED_KEY) {
+      if ((tmp_hl = (HyperLink *) hashsetiter_entry(&hsit))) {
+        if ((HashKeyType) tmp_hl < DELETED_KEY) {
           vec_push(hls, (LmnWord) tmp_hl);
         }
       }
@@ -1290,16 +1292,16 @@ void lmn_convert_hl_to_mem_sub(LmnMembrane *gr, LmnMembrane *mem, HyperLink *hl)
 
   // ハイパーリンクをルートからたどる
   int i, linknum;
-  LmnSAtom hlatom, *atom;
-  LmnAtom newatom;
+  LmnSAtom hlatom, atom;
+  LmnSAtom newatom;
   for (i = 0; i < vec_num(hls); i++) {
     tmp_hl = (HyperLink *) vec_get(hls, i);
 
     // ハイパーリンクに対応するアトムを生成して、もともと接続されていたアトムと接続し膜へ追加
     hlatom = lmn_hyperlink_hl_to_at(tmp_hl);
-    atom = LMN_SATOM_GET_LINK(hlatom, 0);
-    newatom = LMN_ATOM(lmn_new_atom(LMN_HLMEM_ATOM_FUNCTOR)); // '+'アトム。ハイパーリンクアトムに対応。
-    lmn_mem_push_atom(hlmem, newatom, 0);
+    atom = LMN_SATOM(LMN_SATOM_GET_LINK(hlatom, 0));
+    newatom = lmn_new_atom(LMN_HLMEM_ATOM_FUNCTOR); // '+'アトム。ハイパーリンクアトムに対応。
+    lmn_mem_push_atom(hlmem, LMN_ATOM(newatom), 0);
 
     linknum = lmn_get_atom_link_num(hlatom, atom);
     if(linknum != -1) {
@@ -1339,11 +1341,11 @@ void lmn_convert_mem_to_hl(LmnMembrane *hlmem)
     EACH_ATOM(hlmem_atom, ent, ({
           // リンクをたどり接続されているアトムを取得する
           tmp_old_atom = hlmem_atom;
-          tmp_atom = LMN_SATOM_GET_LINK(hlmem_atom, 0);
+          tmp_atom = LMN_SATOM(LMN_SATOM_GET_LINK(hlmem_atom, 0));
           while( LMN_SATOM_IS_PROXY(tmp_atom) ){
-            mem = LMN_SATOM_GET_LINK(tmp_atom, 2);
-            tmp_atom0 = LMN_SATOM_GET_LINK(tmp_atom, 0);
-            tmp_atom1 = LMN_SATOM_GET_LINK(tmp_atom, 1);
+            mem = (LmnMembrane *) LMN_SATOM_GET_LINK(tmp_atom, 2);
+            tmp_atom0 = LMN_SATOM(LMN_SATOM_GET_LINK(tmp_atom, 0));
+            tmp_atom1 = LMN_SATOM(LMN_SATOM_GET_LINK(tmp_atom, 1));
             if(tmp_atom0 != tmp_old_atom){
               tmp_old_atom = tmp_atom;
               tmp_atom = tmp_atom0;
@@ -1360,7 +1362,7 @@ void lmn_convert_mem_to_hl(LmnMembrane *hlmem)
           mem_remove_symbol_atom(hlmem, LMN_SATOM(hlmem_atom));
           lmn_delete_atom(LMN_SATOM(hlmem_atom));
           // make hyperlink atom
-          tmp_hlatom = lmn_copy_atom(hl_atom, LMN_HL_ATTR);
+          tmp_hlatom = LMN_SATOM(lmn_copy_atom(LMN_ATOM(hl_atom), LMN_HL_ATTR));
           lmn_mem_push_atom(mem, LMN_ATOM(tmp_hlatom), LMN_HL_ATTR);
           lmn_mem_newlink(mem, LMN_ATOM(tmp_atom), 0, linknum, LMN_ATOM(tmp_hlatom), LMN_HL_ATTR, 0);
         }));
@@ -1406,8 +1408,8 @@ void lmn_hyperlink_delete_all(HyperLink *hl)
     if(children){
       HashSetIterator hsit;
       for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
-        if (tmp_hl = (HyperLink *) hashsetiter_entry(&hsit)) {
-          if (((HashKeyType) tmp_hl) < DELETED_KEY) {
+        if ((tmp_hl = (HyperLink *) hashsetiter_entry(&hsit))) {
+          if ((HashKeyType) tmp_hl < DELETED_KEY) {
             vec_push(hls, (LmnWord) tmp_hl);
           }
         }
@@ -1531,11 +1533,11 @@ void lmn_unlink_at_to_at(LmnAtom *at1, int pos1, LmnMembrane *mem1, LmnAtom *at2
   LmnMembrane *mem, *old_mem;
 
   tmp_old_atom = at1;
-  tmp_atom = LMN_SATOM_GET_LINK(at1, pos1);
+  tmp_atom = LMN_SATOM(LMN_SATOM_GET_LINK(at1, pos1));
   while( LMN_SATOM_IS_PROXY(tmp_atom) ){
-    mem = LMN_SATOM_GET_LINK(tmp_atom, 2);
-    tmp_atom0 = LMN_SATOM_GET_LINK(tmp_atom, 0);
-    tmp_atom1 = LMN_SATOM_GET_LINK(tmp_atom, 1);
+    mem = (LmnMembrane *) LMN_SATOM_GET_LINK(tmp_atom, 2);
+    tmp_atom0 = LMN_SATOM(LMN_SATOM_GET_LINK(tmp_atom, 0));
+    tmp_atom1 = LMN_SATOM(LMN_SATOM_GET_LINK(tmp_atom, 1));
     if(tmp_atom0 != tmp_old_atom){
       if(LMN_SATOM_IS_PROXY(tmp_old_atom)){
         // プロキシアトム削除
@@ -1568,7 +1570,7 @@ unsigned long get_max_id(LmnMembrane *mem)
 {
   AtomListEntry *ent;
   unsigned long maxid = 0;
-  if (!mem) return;
+  if (!mem) return 0;
 
   EACH_ATOMLIST(mem, ent, ({
     LmnSAtom atom;
@@ -1596,7 +1598,7 @@ void lmn_init_hyperlink_root(LmnMembrane *gr)
 	  LmnArity arity = LMN_FUNCTOR_ARITY(LMN_SATOM_GET_FUNCTOR(atom));
 	  for (i = 0; i < arity; i++) {
 	    if (i == 1 && LMN_FUNC_IS_HL(LMN_SATOM_GET_FUNCTOR(atom))) {
-	      lmn_hyperlink_get_root(LMN_SATOM_GET_LINK(atom, i));
+	      lmn_hyperlink_get_root(((HyperLink *) LMN_SATOM_GET_LINK(atom, i)));
 	    }
 	  }
 	}));
