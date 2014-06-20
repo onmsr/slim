@@ -80,6 +80,7 @@ typedef struct HyperLink{
 #define LMN_HL_RANK(HL)     ((HL)->rank)
 #define LMN_HL_MEM(HL)      ((HL)->mem)
 #define LMN_HL_ID(HL)       ((HL)->id)
+#define LMN_SET_HL_ID(HL,ID)       ((HL)->id = (ID))
 #define LMN_HL_ATTRATOM(HL)     ((lmn_hyperlink_get_root(HL))->attrAtom)
 #define LMN_HL_ATTRATOM_ATTR(HL) ((lmn_hyperlink_get_root(HL))->attr)
 #define LMN_HL_HAS_ATTR(HL)     (LMN_HL_ATTRATOM_ATTR(lmn_hyperlink_get_root(HL)) || LMN_HL_ATTRATOM(lmn_hyperlink_get_root(HL)))
@@ -163,6 +164,32 @@ unsigned long lmn_hlhash(HyperLink *hl);
 unsigned long lmn_hlhash_sub(LmnWord atom);
 unsigned long lmn_hlhash_depth(HyperLink *hl,int depth);
 void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned long *sum, int depth);
+
+// ハイパーリンクから膜への変換 @onuma
+// encode
+void lmn_convert_hl_to_mem_root(LmnMembrane *gr);
+void lmn_convert_hl_to_mem(LmnMembrane *gr,LmnMembrane *mem);
+void lmn_convert_hl_to_mem_sub(LmnMembrane *gr,LmnMembrane *mem,HyperLink *hl);
+// decode
+void lmn_convert_mem_to_hl_root(LmnMembrane *gr);
+void lmn_convert_mem_to_hl(LmnMembrane *hlmem);
+// others
+void lmn_link_at_to_at(LmnAtom *at1,int pos1,LmnMembrane *mem1,LmnAtom *at2,int pos2,LmnMembrane *mem2);
+void lmn_unlink_at_to_at(LmnAtom *at1,int pos1,LmnMembrane *mem1,LmnAtom *at2,int pos2,LmnMembrane *mem2);
+unsigned int lmn_get_mem_depth(LmnMembrane *mem);
+int lmn_get_atom_link_num(LmnSAtom srcAt,LmnSAtom destAt);
+void lmn_hyperlink_delete_from_mem(HyperLink *hl);
+void lmn_hyperlink_delete_all(HyperLink *hl);
+unsigned long get_max_id(LmnMembrane *mem);
+void lmn_init_hyperlink_root(LmnMembrane *gr);
+
+#define LMN_HYPERLINK_MEM 444
+#define LMN_HLMEM_ATOM_FUNCTOR 16
+#define HYPERMEM 1
+
+// dump @onuma
+char *get_functor_name(int functor_id);
+void lmn_link_test(LmnMembrane *gr);
 
 
 /* ハイパーリンクhlのハッシュ値を返す. */

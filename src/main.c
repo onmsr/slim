@@ -210,6 +210,10 @@ static void parse_options(int *optid, int argc, char *argv[])
     {"show-rgraph"            , 0, 0, 6013},
     {"debug-tr-dep"           , 0, 0, 6014},
     {"hlhash"                 , 0, 0, 6015},
+    {"hlmem-mhash"            , 0, 0, 6016},
+    {"hlmem-binstr"           , 0, 0, 6017},
+    {"hlmem-compare"          , 0, 0, 6018},
+    {"hlmem"                  , 0, 0, 6019},
     {"prof-nomemeq"           , 0, 0, 6050},
     {"visualize"              , 0, 0, 6100},
     {"hash-compaction"        , 0, 0, 6060},
@@ -500,9 +504,6 @@ static void parse_options(int *optid, int argc, char *argv[])
       lmn_env.debug_por_dep = TRUE;
       lmn_env.enable_por = TRUE;
       break;
-    case 6015:
-      lmn_env.hlhash = TRUE;
-      break;
 #else
     case 6007:
     case 6008:
@@ -515,7 +516,23 @@ static void parse_options(int *optid, int argc, char *argv[])
       usage();
       break;
 #endif
-
+    // hyperlink
+    case 6015:
+      lmn_env.hlhash = TRUE;
+      break;
+    case 6016:
+      lmn_env.hlmem_mhash = TRUE;
+      break;
+    case 6017:
+      lmn_env.hlmem_binstr = TRUE;
+      break;
+    case 6018:
+      lmn_env.hlmem_compare = TRUE;
+      break;
+    case 6019:
+      lmn_env.hlmem = TRUE;
+      break;
+      
 #ifdef PROFILE
     case 6050:
       lmn_env.prof_no_memeq = TRUE;

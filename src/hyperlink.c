@@ -1201,3 +1201,496 @@ void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned
   (*sum) += unit;
 }
 
+
+/* --------------------------------------------------------------- *
+ *  ハイパーリンクから膜への変換                                     *
+ * -------------------------------------------------------------- */
+
+/* ハイパーリンクを膜に変換する関数 (ハイパーリンク->膜) */
+void lmn_convert_hl_to_mem_root(LmnMembrane *gr)
+{
+  /* lmn_init_hyperlink_root(gr); */
+
+  // 引数のグローバルルート膜を始点にして、全膜内のハイパーリンクアトム探索
+  // ハイパーリンクに出会ったときに変換
+  AtomListEntry *ent;
+  LmnSAtom atom;
+  while(ent = lmn_mem_get_atomlist(gr, LMN_HL_FUNC)){
+    if(!ent || ( atomlist_head(ent) == lmn_atomlist_end(ent) )) break;
+
+    EACH_ATOM(atom, ent, ({
+          lmn_convert_hl_to_mem_sub(gr, gr, lmn_hyperlink_at_to_hl(atom));
+          break;
+        }));
+  }
+
+  // 子の膜について再帰する
+  LmnMembrane *m;
+  for(m = gr->child_head; m; m = m->next){
+    if(LMN_MEM_ATTR(m) != LMN_HYPERLINK_MEM){    // ハイパーリンク膜以外
+      lmn_convert_hl_to_mem(gr,m);
+    }
+  }
+}
+
+/* ハイパーリンクを膜に変換する関数 */
+void lmn_convert_hl_to_mem(LmnMembrane *gr, LmnMembrane *mem)
+{
+  AtomListEntry *ent;
+  LmnSAtom atom;
+  while(ent = lmn_mem_get_atomlist(mem, LMN_HL_FUNC)){
+    if(!ent || ( atomlist_head(ent) == lmn_atomlist_end(ent) )) break;
+    EACH_ATOM(atom, ent, ({
+          lmn_convert_hl_to_mem_sub(gr, mem, lmn_hyperlink_at_to_hl(atom));
+          break;
+        }));
+  }
+
+  LmnMembrane *m;
+  for(m = mem->child_head; m; m = m->next){
+    if(LMN_MEM_ATTR(m) != LMN_HYPERLINK_MEM){    // ハイパーリンク膜以外
+      lmn_convert_hl_to_mem(gr,m);
+    }
+  }
+}
+
+
+/* ハイパーリンクを膜に変換する関数。ひとつのハイパーリンクについてその集合を変換する */
+void lmn_convert_hl_to_mem_sub(LmnMembrane *gr, LmnMembrane *mem, HyperLink *hl)
+{
+  // 膜の作成・初期化,ハイパーリンクという属性を表すようなものを付加
+  // parentにグローバルルート膜
+  LmnMembrane *hlmem = lmn_mem_make();
+  lmn_mem_set_attr(hlmem, LMN_HYPERLINK_MEM);
+  lmn_mem_add_child_mem(gr, hlmem);
+  // lmn_mem_set_active(hlmem, TRUE);
+
+  // ハイパーリンクの集合のIDを取得し、膜のatom_data_numに退避する
+  unsigned long hid = LMN_HL_ID(lmn_hyperlink_get_root(hl));
+  lmn_mem_data_atom_set(hlmem, hid);
+
+  // ハイパーリンクを全部取得
+  HyperLink *tmp_hl = lmn_hyperlink_get_root(hl);
+
+  int len = lmn_hyperlink_element_num(hl);
+  Vector *hls = vec_make(len);
+  vec_push(hls, (LmnWord) tmp_hl);
+
+  HashSet *children = tmp_hl->children;
+  if(children){
+    HashSetIterator hsit;
+    for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
+      if (tmp_hl = (HyperLink *) hashsetiter_entry(&hsit)) {
+        if (((HashKeyType) tmp_hl) < DELETED_KEY) {
+          vec_push(hls, (LmnWord) tmp_hl);
+        }
+      }
+    }
+  }
+
+  // ハイパーリンクをルートからたどる
+  int i, linknum;
+  LmnSAtom hlatom, *atom;
+  LmnAtom newatom;
+  for (i = 0; i < vec_num(hls); i++) {
+    tmp_hl = (HyperLink *) vec_get(hls, i);
+
+    // ハイパーリンクに対応するアトムを生成して、もともと接続されていたアトムと接続し膜へ追加
+    hlatom = lmn_hyperlink_hl_to_at(tmp_hl);
+    atom = LMN_SATOM_GET_LINK(hlatom, 0);
+    newatom = LMN_ATOM(lmn_new_atom(LMN_HLMEM_ATOM_FUNCTOR)); // '+'アトム。ハイパーリンクアトムに対応。
+    lmn_mem_push_atom(hlmem, newatom, 0);
+
+    linknum = lmn_get_atom_link_num(hlatom, atom);
+    if(linknum != -1) {
+      lmn_link_at_to_at(newatom, 0, hlmem, atom, linknum, mem);
+    }
+  }
+
+  // ハイパーリンク削除
+  lmn_hyperlink_delete_all(hl);
+
+  vec_free(hls);
+}
+
+/* ハイパーリンクから変換した膜をハイパーリンクにデコードする関数(膜->ハイパーリンク) */
+void lmn_convert_mem_to_hl_root(LmnMembrane *gr)
+{
+  LmnMembrane *m;
+  for(m = gr->child_head; m; m = m->next){
+    if(LMN_MEM_ATTR(m) == LMN_HYPERLINK_MEM){
+      lmn_convert_mem_to_hl(m);
+    }
+  }
+}
+
+void lmn_convert_mem_to_hl(LmnMembrane *hlmem)
+{
+  AtomListEntry *ent = lmn_mem_get_atomlist(hlmem, LMN_HLMEM_ATOM_FUNCTOR);
+  LmnSAtom hlmem_atom;
+  LmnSAtom tmp_atom, tmp_old_atom;
+  LmnSAtom tmp_atom0, tmp_atom1;
+  LmnMembrane *mem;
+
+  LmnSAtom tmp_hlatom;
+  LmnSAtom hl_atom = lmn_hyperlink_new();
+
+  if (ent) {
+    EACH_ATOM(hlmem_atom, ent, ({
+          // リンクをたどり接続されているアトムを取得する
+          tmp_old_atom = hlmem_atom;
+          tmp_atom = LMN_SATOM_GET_LINK(hlmem_atom, 0);
+          while( LMN_SATOM_IS_PROXY(tmp_atom) ){
+            mem = LMN_SATOM_GET_LINK(tmp_atom, 2);
+            tmp_atom0 = LMN_SATOM_GET_LINK(tmp_atom, 0);
+            tmp_atom1 = LMN_SATOM_GET_LINK(tmp_atom, 1);
+            if(tmp_atom0 != tmp_old_atom){
+              tmp_old_atom = tmp_atom;
+              tmp_atom = tmp_atom0;
+            }else{
+              tmp_old_atom = tmp_atom;
+              tmp_atom = tmp_atom1;
+            }
+          }
+          int linknum = lmn_get_atom_link_num(tmp_old_atom, tmp_atom);
+
+          // unlink
+          lmn_unlink_at_to_at(hlmem_atom, 0, hlmem, tmp_atom, linknum,mem);
+          //remove hlmem_atom
+          mem_remove_symbol_atom(hlmem, LMN_SATOM(hlmem_atom));
+          lmn_delete_atom(LMN_SATOM(hlmem_atom));
+          // make hyperlink atom
+          tmp_hlatom = lmn_copy_atom(hl_atom, LMN_HL_ATTR);
+          lmn_mem_push_atom(mem, LMN_ATOM(tmp_hlatom), LMN_HL_ATTR);
+          lmn_mem_newlink(mem, LMN_ATOM(tmp_atom), 0, linknum, LMN_ATOM(tmp_hlatom), LMN_HL_ATTR, 0);
+        }));
+
+    // hl_atomを開放
+    lmn_hyperlink_delete(LMN_SATOM(hl_atom));
+    lmn_delete_atom(LMN_SATOM(hl_atom));
+
+    // remove mem
+    lmn_mem_remove_mem(lmn_mem_parent(hlmem), hlmem);
+    lmn_mem_free(hlmem);
+
+    // hyperlink idをルートに設定する
+    unsigned long hid = lmn_mem_data_atom_num(hlmem);
+    LMN_SET_HL_ID(LMN_HL_ATOM_ROOT_HL(tmp_hlatom), hid);
+  }
+
+}
+
+/* 一つのハイパーリンクを削除する関数。ハイパーリンクアトムを膜から取り除き、ハイパーリンク構造体も削除する。 */
+void lmn_hyperlink_delete_from_mem(HyperLink *hl)
+{
+  if(hl){
+    LmnSAtom hlatom = lmn_hyperlink_hl_to_at(hl);
+    mem_remove_symbol_atom(LMN_HL_MEM(hl), LMN_SATOM(hlatom));
+    /* lmn_hyperlink_delete(hlatom); */
+    lmn_hyperlink_delete_old(hlatom);
+    lmn_delete_atom(LMN_SATOM(hlatom));
+  }
+}
+
+/* 一つのハイパーリンクの集合を削除する関数 */
+void lmn_hyperlink_delete_all(HyperLink *hl)
+{
+  if(hl){
+    // ハイパーリンクを全部取得
+    HyperLink *tmp_hl = lmn_hyperlink_get_root(hl);
+    int len = lmn_hyperlink_element_num(hl);
+    Vector *hls = vec_make(len);
+    vec_push(hls, (LmnWord) tmp_hl);
+
+    HashSet *children = tmp_hl->children;
+    if(children){
+      HashSetIterator hsit;
+      for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
+        if (tmp_hl = (HyperLink *) hashsetiter_entry(&hsit)) {
+          if (((HashKeyType) tmp_hl) < DELETED_KEY) {
+            vec_push(hls, (LmnWord) tmp_hl);
+          }
+        }
+      }
+    }
+
+    // ハイパーリンクを削除
+    int i;
+    for (i = 0; i < vec_num(hls); i++) {
+      tmp_hl = (HyperLink *) vec_get(hls, i);
+      lmn_hyperlink_delete_from_mem(tmp_hl);
+    }
+
+    vec_free(hls);
+  }
+}
+
+/* 膜の深さを取得する関数 */
+/* グローバルルート膜が深さ1 */
+unsigned int lmn_get_mem_depth(LmnMembrane *mem)
+{
+  unsigned int depth = 0;
+  LmnMembrane *tmpcmem, *tmppmem = mem;
+  do{
+    depth++;
+    tmpcmem = tmppmem;
+    tmppmem = lmn_mem_parent(tmpcmem);
+  }while(tmppmem != tmpcmem && tmppmem != NULL);
+  return depth;
+}
+
+/* 接続元のアトムが接続先のアトムの何番目のリンクに接続されているか取得する関数 */
+int lmn_get_atom_link_num(LmnSAtom srcAt, LmnSAtom destAt)
+{
+  int i, srcId = LMN_SATOM_ID(srcAt);
+  LmnArity arity = LMN_SATOM_GET_ARITY(destAt);
+  for(i = 0; i < arity; i++){
+    if(!LMN_ATTR_IS_DATA_WITHOUT_EX(LMN_SATOM_GET_ATTR(destAt,i))
+       && LMN_SATOM_ID(LMN_SATOM_GET_LINK(destAt,i)) == srcId)
+      return i;
+  }
+  LMN_ASSERT(0);
+  return -1;
+}
+
+/* 2つのアトム間をリンクでつなぐ関数。途中に膜がある場合にはプロキシを設置していく。 */
+void lmn_link_at_to_at(LmnAtom *at1, int pos1, LmnMembrane *mem1, LmnAtom *at2, int pos2, LmnMembrane *mem2)
+{
+  //膜の深さを調べる
+  int depth1 = lmn_get_mem_depth(mem1);
+  int depth2 = lmn_get_mem_depth(mem2);
+
+  // 親膜をたどっていく。同時にin, outプロキシ作成する。
+  // まずは深さの深い方の膜の親膜をたどっていき、2つの膜の深さを合わせる。そのあとは同じ膜に行きつくまで、同時に親膜をたどっていく。
+  LmnMembrane *tmpcmem1, *tmppmem1;
+  LmnMembrane *tmpcmem2, *tmppmem2;
+  LmnSAtom in1, out1, old_out1 = NULL;
+  LmnSAtom in2, out2, old_out2 = NULL;
+  int tmpdepth1 = depth1;
+  int tmpdepth2 = depth2;
+  tmppmem1 = mem1; tmppmem2 = mem2;
+  while(1){
+    if(depth1 == depth2 && (tmppmem1 == tmppmem2 || depth1 == 1 || depth2 == 1))
+      break;
+
+    // mem1がmem2よりも階層が深い場合。または深さが等しくなったとき。
+    if(depth1 >= depth2){
+      tmpcmem1 = tmppmem1;
+      tmppmem1 = lmn_mem_parent(tmpcmem1);
+      in1  = lmn_mem_newatom(tmpcmem1, LMN_IN_PROXY_FUNCTOR);
+      out1 = lmn_mem_newatom(tmppmem1, LMN_OUT_PROXY_FUNCTOR);
+      lmn_newlink_in_symbols(in1, 0, out1, 0);
+      if(old_out1 != NULL){
+        lmn_newlink_in_symbols(old_out1, 1, in1, 1);
+      }else{
+        lmn_newlink_in_symbols(in1, 1, at1, pos1);
+      }
+      old_out1 = out1;
+      tmpdepth1--;
+    }
+
+    // mem2がmem1よりも階層が深い場合。または深さが等しくなったとき。
+    if(depth1 <= depth2){
+      tmpcmem2 = tmppmem2;
+      tmppmem2 = lmn_mem_parent(tmpcmem2);
+      in2  = lmn_mem_newatom(tmpcmem2, LMN_IN_PROXY_FUNCTOR);
+      out2 = lmn_mem_newatom(tmppmem2, LMN_OUT_PROXY_FUNCTOR);
+      lmn_newlink_in_symbols(in2, 0, out2, 0);
+      if(old_out2 != NULL){
+        lmn_newlink_in_symbols(old_out2, 1, in2, 1);
+      }else{
+        lmn_newlink_in_symbols(in2, 1, at2, pos2);
+      }
+      old_out2 = out2;
+      tmpdepth2--;
+    }
+
+    depth1 = tmpdepth1;
+    depth2 = tmpdepth2;
+
+  }
+
+  // 最後に同階層の$out-$outリンクをつなぐ。$outがないときはもとのアトムと接続する
+  if(old_out1 != NULL && old_out2 != NULL){
+    lmn_newlink_in_symbols(old_out1, 1, old_out2, 1);
+  }else if(old_out1 != NULL && old_out2 == NULL){
+    lmn_newlink_in_symbols(old_out1, 1, at2, pos2);
+  }else if(old_out1 == NULL && old_out2 != NULL){
+    lmn_newlink_in_symbols(at1, pos1, old_out2, 1);
+  }else{
+    lmn_newlink_in_symbols(at1, pos1, at2, pos2);
+  }
+
+}
+
+/* 2つのアトム間をアンリンクする関数。2つのアトム間で途中に膜を通過しプロキシがあるときにはそのプロキシアトムを削除する。*/
+void lmn_unlink_at_to_at(LmnAtom *at1, int pos1, LmnMembrane *mem1, LmnAtom *at2, int pos2, LmnMembrane *mem2)
+{
+  LmnSAtom tmp_atom, tmp_old_atom;
+  LmnSAtom tmp_atom0, tmp_atom1;
+  LmnMembrane *mem, *old_mem;
+
+  tmp_old_atom = at1;
+  tmp_atom = LMN_SATOM_GET_LINK(at1, pos1);
+  while( LMN_SATOM_IS_PROXY(tmp_atom) ){
+    mem = LMN_SATOM_GET_LINK(tmp_atom, 2);
+    tmp_atom0 = LMN_SATOM_GET_LINK(tmp_atom, 0);
+    tmp_atom1 = LMN_SATOM_GET_LINK(tmp_atom, 1);
+    if(tmp_atom0 != tmp_old_atom){
+      if(LMN_SATOM_IS_PROXY(tmp_old_atom)){
+        // プロキシアトム削除
+        mem_remove_symbol_atom(old_mem, LMN_SATOM(tmp_old_atom));
+        lmn_delete_atom(LMN_SATOM(tmp_old_atom));
+      }
+      tmp_old_atom = tmp_atom;
+      old_mem = mem;
+      tmp_atom = tmp_atom0;
+    }else{
+      if(LMN_SATOM_IS_PROXY(tmp_old_atom)){
+        // プロキシアトム削除
+        mem_remove_symbol_atom(old_mem, LMN_SATOM(tmp_old_atom));
+        lmn_delete_atom(LMN_SATOM(tmp_old_atom));
+      }
+      tmp_old_atom = tmp_atom;
+      old_mem = mem;
+      tmp_atom = tmp_atom1;
+    }
+  }
+  if(LMN_SATOM_IS_PROXY(tmp_old_atom)){
+    // プロキシアトム削除
+    mem_remove_symbol_atom(old_mem, LMN_SATOM(tmp_old_atom));
+    lmn_delete_atom(LMN_SATOM(tmp_old_atom));
+  }
+}
+
+/* 膜内のアトムで最大のIDを返す */
+unsigned long get_max_id(LmnMembrane *mem)
+{
+  AtomListEntry *ent;
+  unsigned long maxid = 0;
+  if (!mem) return;
+
+  EACH_ATOMLIST(mem, ent, ({
+    LmnSAtom atom;
+    EACH_ATOM(atom, ent, ({
+	  if(LMN_SATOM_ID(atom) > maxid) maxid = LMN_SATOM_ID(atom);
+    }));
+  }));
+
+  LmnMembrane *m;
+  unsigned long cmaxid;
+  for(m = mem->child_head; m; m = m->next){
+    cmaxid = get_max_id(m);
+    if(cmaxid > maxid) maxid = cmaxid;
+  }
+  return maxid;
+}
+
+void lmn_init_hyperlink_root(LmnMembrane *gr)
+{
+  AtomListEntry *ent = lmn_mem_get_atomlist(gr, LMN_HL_FUNC);
+  if(ent){
+    LmnSAtom atom;
+    EACH_ATOM(atom, ent, ({
+	  unsigned int i;
+	  LmnArity arity = LMN_FUNCTOR_ARITY(LMN_SATOM_GET_FUNCTOR(atom));
+	  for (i = 0; i < arity; i++) {
+	    if (i == 1 && LMN_FUNC_IS_HL(LMN_SATOM_GET_FUNCTOR(atom))) {
+	      lmn_hyperlink_get_root(LMN_SATOM_GET_LINK(atom, i));
+	    }
+	  }
+	}));
+  }
+}
+
+/* for debug @onuma */
+char *get_functor_name(int functor_id)
+{
+  char *functor_array[22] = {
+    "LMN_IN_PROXY_FUNCTOR",
+    "LMN_OUT_PROXY_FUNCTOR",
+    "LMN_STAR_PROXY_FUNCTOR",
+    "LMN_UNIFY_FUNCTOR",
+    "LMN_LIST_FUNCTOR",
+    "LMN_NIL_FUNCTOR",
+    "LMN_RESUME_FUNCTOR",
+    "LMN_ARITHMETIC_IADD_FUNCTOR",
+    "LMN_ARITHMETIC_ISUB_FUNCTOR",
+    "LMN_ARITHMETIC_IMUL_FUNCTOR",
+    "LMN_ARITHMETIC_IDIV_FUNCTOR",
+    "LMN_ARITHMETIC_MOD_FUNCTOR",
+    "LMN_ARITHMETIC_FADD_FUNCTOR",
+    "LMN_ARITHMETIC_FSUB_FUNCTOR",
+    "LMN_ARITHMETIC_FMUL_FUNCTOR",
+    "LMN_ARITHMETIC_FDIV_FUNCTOR",
+    "LMN_UNARY_PLUS_FUNCTOR",
+    "LMN_UNARY_MINUS_FUNCTOR",
+    "LMN_MEM_EQ_FUNCTOR",
+    "LMN_TRUE_FUNCTOR",
+    "LMN_FALSE_FUNCTOR",
+    "LMN_EXCLAMATION_FUNCTOR"
+  };
+
+  if(functor_id > 22) return "out of 22";
+  return functor_array[functor_id];
+}
+
+/* リンクテスト for debug @onuma */
+/* 以下LMNtalプログラムの構造に適用 */
+/* a(X). b(X). { { c(Y). d(Y). } }. */
+void lmn_link_test(LmnMembrane *gr)
+{
+  printf("before-----------------\n");
+  lmn_dump_mem_dev(gr);
+  printf("before end-----------------\n\n");
+
+  AtomListEntry *ent;
+  LmnSAtom at1 = NULL;
+  LmnSAtom at2 = NULL;
+  LmnSAtom at3 = NULL;
+  LmnSAtom at4 = NULL;
+  LmnSAtom at5 = NULL;
+  LmnSAtom at6 = NULL;
+
+  LmnSAtom atom;
+  EACH_ATOMLIST(gr, ent, ({
+        EACH_ATOM(atom, ent, ({
+              if(at1 == NULL){ at1 = LMN_SATOM(atom); }else if(at2 == NULL){ at2 = LMN_SATOM(atom); }
+              else if(at3 == NULL){ at3 = LMN_SATOM(atom); }else if(at4 == NULL){ at4 = LMN_SATOM(atom); }
+              else if(at5 == NULL){ at5 = LMN_SATOM(atom); }else if(at6 == NULL){ at6 = LMN_SATOM(atom); }
+            }));
+      }));
+
+  LmnMembrane *m = gr->child_head->child_head;
+  EACH_ATOMLIST(m, ent, ({
+        EACH_ATOM(atom, ent, ({
+              if(at1 == NULL){ at1 = LMN_SATOM(atom); }else if(at2 == NULL){ at2 = LMN_SATOM(atom); }
+              else if(at3 == NULL){ at3 = LMN_SATOM(atom); }else if(at4 == NULL){ at4 = LMN_SATOM(atom); }
+              else if(at5 == NULL){ at5 = LMN_SATOM(atom); }else if(at6 == NULL){ at6 = LMN_SATOM(atom); }
+            }));
+      }));
+
+  {
+    /* dump_atom_dev(at1); */
+    /* dump_atom_dev(at2); */
+    /* dump_atom_dev(at3); */
+    /* dump_atom_dev(at4); */
+
+    // link (a-b, c-d -> a-c, b-d)
+    lmn_link_at_to_at(at1, 0, gr, at3, 0, m);
+    lmn_link_at_to_at(at2, 0, gr, at4, 0, m);
+
+    // unlink (a-c, b-d -> a, c, b, d)
+    lmn_unlink_at_to_at(at1, 0, gr, at3, 0, m);
+    lmn_unlink_at_to_at(at2, 0, gr, at4, 0, m);
+
+    // link (a, b, c, d -> a-b, c-d)
+    lmn_link_at_to_at(at1, 0, gr, at2, 0, gr);
+    lmn_link_at_to_at(at3, 0, m, at4, 0, m);
+  }
+
+  printf("\nafter-----------------\n");
+  lmn_dump_mem_dev(gr);
+  printf("after end-----------------\n");
+
+}

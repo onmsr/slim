@@ -338,6 +338,10 @@ struct LmnEnv {
   char *ltl_exp;
 
   BOOL hlhash;
+  BOOL hlmem_mhash;
+  BOOL hlmem_binstr;
+  BOOL hlmem_compare;
+  BOOL hlmem;
 };
 
 

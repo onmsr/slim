@@ -215,14 +215,17 @@ struct LmnMembrane {
   LmnMembrane          *child_head;
   LmnMembrane          *prev, *next;
   struct Vector        rulesets;
+  unsigned long         attr;
 };
 
 #define LMN_MEM_NAME_ID(MP)          ((MP)->name)
+#define LMN_MEM_ATTR(MP)             ((MP)->attr)
 #define LMN_MEM_NAME(MP)             LMN_SYMBOL_STR(LMN_MEM_NAME_ID(MP))
 #define lmn_mem_parent(M)            ((M)->parent)
 #define lmn_mem_is_active(M)         ((M)->is_activated)
 #define lmn_mem_max_functor(M)       ((M)->max_functor)
 #define lmn_mem_set_name(M, N)       ((M)->name = (N))
+#define lmn_mem_set_attr(M, N)       ((M)->attr = (N))
 #define lmn_mem_set_active(M, F)     ((M)->is_activated = (F))
 #define lmn_mem_get_rulesets(M)      (&((M)->rulesets))
 #define lmn_mem_ruleset_num(M)       (vec_num(lmn_mem_get_rulesets(M)))
