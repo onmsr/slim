@@ -621,7 +621,7 @@ typedef int AtomListIter;
 #define atomlist_iter_get_functor(Iter)    (Iter)
 #else
 typedef HashIterator AtomListIter;
-#define atomlist_iter_initalizer(AS)       hashtbl_iterator(&(AS))
+#define atomlist_iter_initializer(AS)       hashtbl_iterator(&(AS))
 #define atomlist_iter_condition(Mem, Iter) (!hashtbliter_isend(&Iter))
 #define atomlist_iter_next(Iter)           hashtbliter_next(&Iter)
 #define atomlist_iter_get_entry(Mem, Iter) ((AtomListEntry *)hashtbliter_entry(&(Iter))->data)

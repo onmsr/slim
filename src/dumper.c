@@ -919,7 +919,7 @@ void dump_atom_dev(LmnSAtom atom)
           fprintf(stdout, "double[%f], ", *(double*)LMN_SATOM_GET_LINK(atom,i));
           break;
         case  LMN_HL_ATTR:
-          fprintf(stdout, "hlink[ !, Addr:%lu, ID:%lu], "
+          fprintf(stdout, "hlink[ !, Addr:%p, ID:%lu], "
                         , LMN_SATOM_GET_LINK(atom, i)
                         , LMN_SATOM_ID(LMN_SATOM_GET_LINK(atom, i)));
           break;

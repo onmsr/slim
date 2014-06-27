@@ -957,6 +957,7 @@ static BOOL interpret(LmnReactCxt *rc, LmnRule rule, LmnRuleInstr instr)
           }
 #else
           for (i = 0; i < warry_size_org; i++) {
+            LmnWord t;
             v[i].at = at(rc, i);
             if (LMN_ATTR_IS_DATA(v[i].at)) {
               if (v[i].at == LMN_HL_ATTR) {

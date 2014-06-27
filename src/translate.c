@@ -151,6 +151,7 @@ void tr_instr_commit_ready(LmnReactCxt      *rc,
       }
 #else
       for (i = 0; i < warry_size_org; i++) {
+        LmnWord t;
         v[i].at = at(rc, i);
         if (LMN_ATTR_IS_DATA(v[i].at)) {
           v[i].wt = (LmnWord)lmn_copy_data_atom((LmnAtom)wt(rc, i), (LmnLinkAttr)v[i].at);
