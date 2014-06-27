@@ -152,7 +152,8 @@ LmnMembrane *lmn_mem_make(void)
 #endif
   vec_init(&mem->rulesets, 1);
   lmn_mem_set_id(mem, env_gen_next_id());
-
+  mem->attr          = 0;
+  
   return mem;
 }
 

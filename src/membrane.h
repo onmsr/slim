@@ -215,7 +215,7 @@ struct LmnMembrane {
   LmnMembrane          *child_head;
   LmnMembrane          *prev, *next;
   struct Vector        rulesets;
-  unsigned long         attr;
+  unsigned int         attr;
 };
 
 #define LMN_MEM_NAME_ID(MP)          ((MP)->name)

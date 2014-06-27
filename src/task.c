@@ -221,6 +221,13 @@ void lmn_run(Vector *start_rulesets)
       fprintf(stdout, "finish.\n");
     } else {
       lmn_dump_cell_stdout(mem);
+
+      if(lmn_env.hlmem){
+        lmn_convert_hl_to_mem_root(mem); // ハイパーリンク->ハイパーリンク膜 エンコード
+        lmn_dump_cell_stdout(mem);
+        lmn_convert_mem_to_hl_root(mem); // ハイパーリンク膜->ハイパーリンク デコード
+      }
+      
     }
   }
   if (lmn_env.show_hyperlink) lmn_hyperlink_print(mem);

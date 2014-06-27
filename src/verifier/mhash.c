@@ -81,6 +81,21 @@ void mhash_set_depth(int depth)
 
 mhash_t mhash(LmnMembrane *mem)
 {
+  if(lmn_env.hlmem_mhash){
+    ProcessID id = env_next_id();
+    ProcessID maxId = get_max_id(mem)+1;
+
+    // convert hl to mem
+    env_set_next_id(maxId);
+    lmn_convert_hl_to_mem_root(mem);
+
+    mhash_t ret = mhash_sub(mem, round2up(id + env_next_id() - maxId));
+    
+    // convert mem to hl
+    env_set_next_id(get_max_id(mem)+1);
+    lmn_convert_mem_to_hl_root(mem);
+    return ret;
+  }
   return mhash_sub(mem, round2up(env_next_id()));
   //return mhash_sub(mem, 1024);
   //return 10;

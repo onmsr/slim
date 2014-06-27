@@ -1258,8 +1258,7 @@ void lmn_convert_hl_to_mem(LmnMembrane *gr, LmnMembrane *mem)
 /* ハイパーリンクを膜に変換する関数。ひとつのハイパーリンクについてその集合を変換する */
 void lmn_convert_hl_to_mem_sub(LmnMembrane *gr, LmnMembrane *mem, HyperLink *hl)
 {
-  // 膜の作成・初期化,ハイパーリンクという属性を表すようなものを付加
-  // parentにグローバルルート膜
+  // 膜の作成・初期化, グローバルルート膜に追加
   LmnMembrane *hlmem = lmn_mem_make();
   lmn_mem_set_attr(hlmem, LMN_HYPERLINK_MEM);
   lmn_mem_add_child_mem(gr, hlmem);
@@ -1356,9 +1355,11 @@ void lmn_convert_mem_to_hl(LmnMembrane *hlmem)
 
           // unlink
           lmn_unlink_at_to_at(hlmem_atom, 0, hlmem, tmp_atom, linknum,mem);
+          
           //remove hlmem_atom
           mem_remove_symbol_atom(hlmem, LMN_SATOM(hlmem_atom));
           lmn_delete_atom(LMN_SATOM(hlmem_atom));
+          
           // make hyperlink atom
           tmp_hlatom = LMN_SATOM(lmn_copy_atom(LMN_ATOM(hl_atom), LMN_HL_ATTR));
           lmn_mem_push_atom(mem, LMN_ATOM(tmp_hlatom), LMN_HL_ATTR);
@@ -1366,30 +1367,19 @@ void lmn_convert_mem_to_hl(LmnMembrane *hlmem)
         }));
 
     // hl_atomを開放
-    lmn_hyperlink_delete(LMN_SATOM(hl_atom));
+    lmn_hyperlink_delete(LMN_SATOM(hl_atom));  
+    /* lmn_hyperlink_delete_old(LMN_SATOM(hl_atom)); */
     lmn_delete_atom(LMN_SATOM(hl_atom));
-
-    // remove mem
-    lmn_mem_remove_mem(lmn_mem_parent(hlmem), hlmem);
-    lmn_mem_free(hlmem);
 
     // hyperlink idをルートに設定する
     unsigned long hid = lmn_mem_data_atom_num(hlmem);
     LMN_SET_HL_ID(LMN_HL_ATOM_ROOT_HL(tmp_hlatom), hid);
+    
+    // remove mem
+    lmn_mem_remove_mem(lmn_mem_parent(hlmem), hlmem);
+    lmn_mem_free(hlmem);
   }
 
-}
-
-/* 一つのハイパーリンクを削除する関数。ハイパーリンクアトムを膜から取り除き、ハイパーリンク構造体も削除する。 */
-void lmn_hyperlink_delete_from_mem(HyperLink *hl)
-{
-  if(hl){
-    LmnSAtom hlatom = lmn_hyperlink_hl_to_at(hl);
-    mem_remove_symbol_atom(LMN_HL_MEM(hl), LMN_SATOM(hlatom));
-    /* lmn_hyperlink_delete(hlatom); */
-    lmn_hyperlink_delete_old(hlatom);
-    lmn_delete_atom(LMN_SATOM(hlatom));
-  }
 }
 
 /* 一つのハイパーリンクの集合を削除する関数 */
@@ -1398,9 +1388,10 @@ void lmn_hyperlink_delete_all(HyperLink *hl)
   if(hl){
     // ハイパーリンクを全部取得
     HyperLink *tmp_hl = lmn_hyperlink_get_root(hl);
+    LmnSAtom hlatom = lmn_hyperlink_hl_to_at(tmp_hl);
     int len = lmn_hyperlink_element_num(hl);
     Vector *hls = vec_make(len);
-    vec_push(hls, (LmnWord) tmp_hl);
+    vec_push(hls, (LmnWord) hlatom);
 
     HashSet *children = tmp_hl->children;
     if(children){
@@ -1408,7 +1399,8 @@ void lmn_hyperlink_delete_all(HyperLink *hl)
       for (hsit = hashset_iterator(children); !hashsetiter_isend(&hsit); hashsetiter_next(&hsit)) {
         if ((tmp_hl = (HyperLink *) hashsetiter_entry(&hsit))) {
           if ((HashKeyType) tmp_hl < DELETED_KEY) {
-            vec_push(hls, (LmnWord) tmp_hl);
+            hlatom = lmn_hyperlink_hl_to_at(tmp_hl);
+            vec_push(hls, (LmnWord) hlatom);
           }
         }
       }
@@ -1417,8 +1409,11 @@ void lmn_hyperlink_delete_all(HyperLink *hl)
     // ハイパーリンクを削除
     int i;
     for (i = 0; i < vec_num(hls); i++) {
-      tmp_hl = (HyperLink *) vec_get(hls, i);
-      lmn_hyperlink_delete_from_mem(tmp_hl);
+      hlatom = (LmnSAtom *) vec_get(hls, i);
+      mem_remove_symbol_atom(LMN_HL_MEM(lmn_hyperlink_at_to_hl(hlatom)), hlatom);
+      lmn_hyperlink_delete(hlatom);
+      /* lmn_hyperlink_delete_old(hlatom); */
+      lmn_delete_atom(hlatom);
     }
 
     vec_free(hls);
@@ -1441,16 +1436,16 @@ unsigned int lmn_get_mem_depth(LmnMembrane *mem)
 
 /* 接続元のアトムが接続先のアトムの何番目のリンクに接続されているか取得する関数 */
 int lmn_get_atom_link_num(LmnSAtom srcAt, LmnSAtom destAt)
-{
+{  
   int i, srcId = LMN_SATOM_ID(srcAt);
   LmnArity arity = LMN_SATOM_GET_ARITY(destAt);
   for(i = 0; i < arity; i++){
-    if(!LMN_ATTR_IS_DATA_WITHOUT_EX(LMN_SATOM_GET_ATTR(destAt,i))
-       && LMN_SATOM_ID(LMN_SATOM_GET_LINK(destAt,i)) == srcId)
+    if(!LMN_ATTR_IS_DATA_WITHOUT_EX(LMN_SATOM_GET_ATTR(destAt, i))
+       && LMN_SATOM_ID(LMN_SATOM_GET_LINK(destAt, i)) == srcId)
       return i;
   }
   LMN_ASSERT(0);
-  return -1;
+  return -1;  
 }
 
 /* 2つのアトム間をリンクでつなぐ関数。途中に膜がある場合にはプロキシを設置していく。 */
@@ -1586,63 +1581,3 @@ unsigned long get_max_id(LmnMembrane *mem)
   return maxid;
 }
 
-
-/* リンクテスト for debug @onuma */
-/* 以下LMNtalプログラムの構造に適用 */
-/* a(X). b(X). { { c(Y). d(Y). } }. */
-void lmn_link_test(LmnMembrane *gr)
-{
-  printf("before-----------------\n");
-  lmn_dump_mem_dev(gr);
-  printf("before end-----------------\n\n");
-
-  AtomListEntry *ent;
-  LmnSAtom at1 = NULL;
-  LmnSAtom at2 = NULL;
-  LmnSAtom at3 = NULL;
-  LmnSAtom at4 = NULL;
-  LmnSAtom at5 = NULL;
-  LmnSAtom at6 = NULL;
-
-  LmnSAtom atom;
-  EACH_ATOMLIST(gr, ent, ({
-        EACH_ATOM(atom, ent, ({
-              if(at1 == NULL){ at1 = LMN_SATOM(atom); }else if(at2 == NULL){ at2 = LMN_SATOM(atom); }
-              else if(at3 == NULL){ at3 = LMN_SATOM(atom); }else if(at4 == NULL){ at4 = LMN_SATOM(atom); }
-              else if(at5 == NULL){ at5 = LMN_SATOM(atom); }else if(at6 == NULL){ at6 = LMN_SATOM(atom); }
-            }));
-      }));
-
-  LmnMembrane *m = gr->child_head->child_head;
-  EACH_ATOMLIST(m, ent, ({
-        EACH_ATOM(atom, ent, ({
-              if(at1 == NULL){ at1 = LMN_SATOM(atom); }else if(at2 == NULL){ at2 = LMN_SATOM(atom); }
-              else if(at3 == NULL){ at3 = LMN_SATOM(atom); }else if(at4 == NULL){ at4 = LMN_SATOM(atom); }
-              else if(at5 == NULL){ at5 = LMN_SATOM(atom); }else if(at6 == NULL){ at6 = LMN_SATOM(atom); }
-            }));
-      }));
-
-  {
-    /* dump_atom_dev(at1); */
-    /* dump_atom_dev(at2); */
-    /* dump_atom_dev(at3); */
-    /* dump_atom_dev(at4); */
-
-    // link (a-b, c-d -> a-c, b-d)
-    lmn_link_at_to_at(at1, 0, gr, at3, 0, m);
-    lmn_link_at_to_at(at2, 0, gr, at4, 0, m);
-
-    // unlink (a-c, b-d -> a, c, b, d)
-    lmn_unlink_at_to_at(at1, 0, gr, at3, 0, m);
-    lmn_unlink_at_to_at(at2, 0, gr, at4, 0, m);
-
-    // link (a, b, c, d -> a-b, c-d)
-    lmn_link_at_to_at(at1, 0, gr, at2, 0, gr);
-    lmn_link_at_to_at(at3, 0, m, at4, 0, m);
-  }
-
-  printf("\nafter-----------------\n");
-  lmn_dump_mem_dev(gr);
-  printf("after end-----------------\n");
-
-}
