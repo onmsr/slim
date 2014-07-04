@@ -868,6 +868,12 @@ static char *profile_time_id_to_name(int type)
   case PROFILE_TIME__REPAIR:
     ret = "repair phase";
     break;
+  case PROFILE_TIME__CONVERT_HL_TO_HLMEM:
+    ret = "convert hl to mem";
+    break;
+  case PROFILE_TIME__CONVERT_HLMEM_TO_HL:
+    ret = "convert mem to hl";
+    break;
   default:
     ret = "unknown";
     break;

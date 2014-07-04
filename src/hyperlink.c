@@ -42,6 +42,10 @@
 #include "membrane.h"
 #include "react_context.h"
 
+#ifdef PROFILE
+#include "runtime_status.h"
+#endif
+
 #if SIZEOF_LONG == 4
 #  define EMPTY_KEY   0xffffffffUL
 #  define DELETED_KEY 0xfffffffeUL
@@ -1209,6 +1213,9 @@ void lmn_hlhash_depth_sub(LmnAtom atom, LmnLinkAttr attr, int i_parent, unsigned
 /* ハイパーリンクを膜に変換する関数 (ハイパーリンク->膜) */
 void lmn_convert_hl_to_mem_root(LmnMembrane *gr)
 {
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3)  profile_start_timer(PROFILE_TIME__CONVERT_HL_TO_HLMEM);
+#endif
   // 引数のグローバルルート膜を始点にして、全膜内のハイパーリンクアトム探索
   // ハイパーリンクに出会ったときに変換
   AtomListEntry *ent;
@@ -1230,6 +1237,10 @@ void lmn_convert_hl_to_mem_root(LmnMembrane *gr)
       lmn_convert_hl_to_mem(gr, m);
     }
   }
+  
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3) profile_finish_timer(PROFILE_TIME__CONVERT_HL_TO_HLMEM);
+#endif
 }
 
 /* ハイパーリンクを膜に変換する関数 */
@@ -1315,12 +1326,20 @@ void lmn_convert_hl_to_mem_sub(LmnMembrane *gr, LmnMembrane *mem, HyperLink *hl)
 /* ハイパーリンクから変換した膜をハイパーリンクにデコードする関数(膜->ハイパーリンク) */
 void lmn_convert_mem_to_hl_root(LmnMembrane *gr)
 {
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3)  profile_start_timer(PROFILE_TIME__CONVERT_HLMEM_TO_HL);
+#endif
+  
   LmnMembrane *m;
   for(m = gr->child_head; m; m = m->next){
     if(LMN_MEM_ATTR(m) == LMN_HYPERLINK_MEM){
       lmn_convert_mem_to_hl(m);
     }
   }
+  
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3) profile_finish_timer(PROFILE_TIME__CONVERT_HLMEM_TO_HL);
+#endif
 }
 
 void lmn_convert_mem_to_hl(LmnMembrane *hlmem)

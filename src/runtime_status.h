@@ -94,6 +94,8 @@ enum PROFILE_TIME {
   PROFILE_TIME__COST_UPDATE,                  /* 最適化実行 */
   PROFILE_TIME__LOCK,                         /* ロックされている時間 */
   PROFILE_TIME__REPAIR,                       /* (MCNDFS)Red DFSのRepair Phaseの時間 */
+  PROFILE_TIME__CONVERT_HL_TO_HLMEM,          /* ハイパーリンクを膜に変換する時間 */
+  PROFILE_TIME__CONVERT_HLMEM_TO_HL,          /* ハイパーリンクを変換した膜を元のハイパーリンクにデコードする時間 */
   PTIME_TAIL,                         /* dummy */
 };
 
