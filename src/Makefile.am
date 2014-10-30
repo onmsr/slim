@@ -1,19 +1,23 @@
-SUBDIRS = utility verifier
+SUBDIRS = utility verifier heuristics
 
 bin_PROGRAMS = slim
 
 slim_LDADD =   -ldl                                    \
                -llmn_verifier                          \
                -llmn_utility                           \
+               -llmn_heuristics                        \
                -lzd_in_slim
 slim_LDFLAGS = -rdynamic                               \
                -L./verifier                            \
                -L./utility                             \
+               -L./heuristics                          \
                -L../third_party/zdelta-2.1
 slim_CFLAGS =  -I./verifier                            \
-               -I./utility
+               -I./utility                             \
+               -I./heuristics
 slim_DEPENDENCIES = ./verifier/liblmn_verifier.a       \
-                    ./utility/liblmn_utility.a
+                    ./utility/liblmn_utility.a         \
+                    ./heuristics/liblmn_heuristics.a
 
 if ENABLE_JNI
 slim_LDADD += -ljvm
