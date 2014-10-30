@@ -337,6 +337,7 @@ struct LmnEnv {
   char *load_path[256];
   char *automata_file;         /* never claim file */
   char *propositional_symbol;  /* file for propositional symbol definitions */
+  char *hil_file;         /* heuristics intermediate language file */
   char *ltl_exp;
 };
 

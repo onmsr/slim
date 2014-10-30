@@ -110,6 +110,7 @@ static void usage(void)
 #endif
           "  --use-bledge        (MC) Use BLEDGE algorithm (LTL model checking)\n"
           "  --disable-map-h     (MC) No use MAP heuristics(LTL model checking)\n"
+          "  --hil <file>        Input <file> as a heuristics intermediate language file\n"
           "  --pscc-driven       (MC) Use SCC analysis of property automata (LTL model checking)\n"
           "  --use-Ncore=<N>     (MC) Use <N>threads\n"
           "  --delta-mem         (MC) Use delta membrane generator\n"
@@ -177,6 +178,7 @@ static void parse_options(int *optid, int argc, char *argv[])
     {"psym"                   , 1, 0, 1411},
     {"ltl-f"                  , 1, 0, 1412},
     {"pscc-driven"            , 0, 0, 1413},
+    {"hil"                    , 1, 0, 1414},
     {"por-old"                , 0, 0, 1419},
     {"por"                    , 0, 0, 1420},
     {"bfs"                    , 0, 0, 1421},
@@ -347,6 +349,9 @@ static void parse_options(int *optid, int argc, char *argv[])
       break;
     case 1413:
       lmn_env.prop_scc_driven = TRUE;
+      break;
+    case 1414:
+      lmn_env.hil_file = optarg;
       break;
     case 1419:
       lmn_env.enable_por_old = TRUE;
