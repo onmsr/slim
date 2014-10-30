@@ -13,6 +13,7 @@ CLEANFILES = $(PARSER_SOURCE) $(PARSER_HEADER)
 liblmn_heuristics_a_CFLAGS = \
         -I../                \
         -I../utility         \
+        -I../verifier        \
         $(CFLAGS)
 
 liblmn_heuristics_a_SOURCES =       \
