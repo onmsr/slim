@@ -54,12 +54,11 @@ libtool
 **/.deps/
 **/.libs/
 config.h
-config.h.in~
+config.h.in
 genconfig
 stamp-h1
 test-driver
 ylwrap
-config.h.in
 aclocal.m4
 lib/config.lmn
 lib/__error_temp.txt
@@ -67,17 +66,10 @@ lib/*.il
 *.lo
 *.la
 src/arch.h
-src/il_lexer.*
-src/il_parser.*
 src/interpret_generated.c
-src/slim
 src/translate_generated.c
-src/verifier/nc_lexer.*
-src/verifier/nc_parser.*
-src/verifier/nc_parser.h
-src/verifier/propsym_lexer.*
-src/verifier/propsym_parser.*
-src/utility/.deps
-src/verifier/.deps
-third_party/google-perftools-1.8.3/.deps
-third_party/zdelta-2.1/.deps
+src/slim
+
+# parser, lexer
+*_parser.[ch]
+*_lexer.[ch]
