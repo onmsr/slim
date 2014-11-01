@@ -94,7 +94,7 @@ static int comp_prule_id_greater_f(const void *a_, const void *b_)
   p1 = *(RuleProfiler **)a_;
   p2 = *(RuleProfiler **)b_;
 
-  return p1->ref_rs_id - p2 ->ref_rs_id;
+  return p1->ref_rs_id - p2->ref_rs_id;
 }
 
 

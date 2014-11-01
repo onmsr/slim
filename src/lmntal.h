@@ -240,6 +240,10 @@ enum SPdumpFormat { SP_NONE, INCREMENTAL, LMN_SYNTAX};
 /* 最適化実行 */
 enum OptimizeMode { OPT_NONE, OPT_MINIMIZE, OPT_MAXIMIZE};
 
+/* heuristic search type */
+enum HSearchType { H_ASTAR };
+
+/* Lmntal Env */
 struct LmnEnv {
   BOOL trace;
   BOOL show_proxy;
@@ -334,6 +338,7 @@ struct LmnEnv {
   enum MCdumpFormat mc_dump_format;
   enum SPdumpFormat sp_dump_format;
   enum OptimizeMode opt_mode;
+  enum HSearchType hstype;
 
   int  load_path_num;
   char *load_path[256];

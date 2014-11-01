@@ -185,6 +185,7 @@ static void parse_options(int *optid, int argc, char *argv[])
     {"bfs"                    , 0, 0, 1421},
     {"limited-step"           , 1, 0, 1422},
     {"search-ends"            , 0, 0, 1423},
+    {"astar"                  , 0, 0, 1424},
     {"mem-enc"                , 0, 0, 2000},
     {"disable-compress"       , 0, 0, 2003},
     {"delta-mem"              , 0, 0, 2005},
@@ -372,6 +373,9 @@ static void parse_options(int *optid, int argc, char *argv[])
       break;
     case 1423:
       lmn_env.nd_search_end = TRUE;
+      break;
+    case 1424:
+      lmn_env.hstype = H_ASTAR;
       break;
     case 2000:
       lmn_env.mem_enc = TRUE;

@@ -458,7 +458,7 @@ void dfs_start(LmnWorker *w)
         worker_set_active(w);
 #ifdef DEBUG
         if(!is_empty_queue(DFS_WORKER_QUEUE(w)) &&  !((Queue*)DFS_WORKER_QUEUE(w))->head->next) {
-          printf("%d : queue is not empty? %d\n", worker_id(w), queue_entry_num(DFS_WORKER_QUEUE(w)));
+          printf("%d : queue is not empty? %lu\n", worker_id(w), queue_entry_num(DFS_WORKER_QUEUE(w)));
         }
 #endif
         if (s || (s = (State *)dequeue(DFS_WORKER_QUEUE(w)))) {
@@ -778,7 +778,7 @@ static inline void mcdfs_loop(LmnWorker *w,
       n = vec_num(fresh);
       if (n > 0) {
         for (i = 0; i < n; i++) {
-          State *fs = (State *)vec_get(fresh, i);
+          State *fs = (State *) vec_get(fresh, i);
           s_unset_fresh(fs);
           put_stack(stack, fs);
         }

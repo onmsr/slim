@@ -995,7 +995,7 @@ static BOOL interpret(LmnReactCxt *rc, LmnRule rule, LmnRuleInstr instr)
             lmn_rule_set_pre_id(rule, ANONYMOUS);
           }
 
-          cur_mem = (LmnMembrane *)wt(rc, 0);
+          cur_mem = (LmnMembrane *) wt(rc, 0);
           /* 変数配列および属性配列を元に戻す */
           lmn_register_free(rc_warry(rc));
           rc_warry_set(rc, tmp);
