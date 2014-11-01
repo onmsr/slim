@@ -52,6 +52,23 @@ void harg_list_push(HArgList args, HArgument arg)
   vec_push(args, (LmnWord) arg);
 }
 
+/* HDest */
+
+BOOL is_register_variable(char *s)
+{
+  char *ret = strchr(s, 'T');
+  return (ret != NULL) ? TRUE : FALSE;
+}
+
+unsigned int get_register_index(char *s)
+{
+  return atoi(++s);
+}
+
+unsigned int get_hdest(HInstruction instr)
+{
+  return get_register_index((char *) LMN_GET_HINSTR_DEST(instr));
+}
 
 
 /* HInstrList */
@@ -75,6 +92,31 @@ HIL hil_make(HInstrList instrs)
   HIL hil = LMN_MALLOC(struct HIL);
   hil->instrs = instrs;
   return hil;
+}
+
+/* HRegister */
+
+void hil_init_hregs(HIL hil, unsigned int size)
+{
+  size += 1; // for register zero
+  LMN_SET_HREGISTER_SIZE(hil, size);
+  LMN_SET_HREGS(hil, vec_make(round2up(size)));
+  int i;
+  for (i = 0; i < size; i++) {
+    vec_push(LMN_GET_HREGS(hil), 0);
+  }
+}
+
+/* HRegList */
+
+LmnWord get_hreg(HIL hil, unsigned int n)
+{
+  return vec_get(LMN_GET_HREGS(hil), n);
+}
+
+void set_hreg(HIL hil, unsigned int n, LmnWord v)
+{
+  vec_set(LMN_GET_HREGS(hil), n, v);
 }
 
 /* dumper */
@@ -121,7 +163,8 @@ void dump_harg(HArgument arg)
 
 char *get_hinstr_by_id(enum LmnHInstruction id)
 {
-  char *LmnHInstructionStr[8] = {
+  char *LmnHInstructionStr[] = {
+    "INIT",
     "ADD",
     "SUB",
     "MUL",
@@ -136,7 +179,8 @@ char *get_hinstr_by_id(enum LmnHInstruction id)
 
 unsigned int get_hinstr_id(char *s)
 {
-  char *LmnHInstructionStr[8] = {
+  char *LmnHInstructionStr[] = {
+    "init",
     "add",
     "sub",
     "mul",
@@ -151,4 +195,18 @@ unsigned int get_hinstr_id(char *s)
     if (strcmp(s, LmnHInstructionStr[i]) == 0) break;
   }
   return i;
+}
+
+
+void dump_hregs(HIL hil)
+{
+  Vector *vec = LMN_GET_HREGS(hil);
+  unsigned int i, n = vec_num(vec);
+  printf("hil register size : %d\n\n", n);
+  printf("hil register [\n");
+  for (i = 0; i < n; i++) {
+    LmnWord v = vec_get(vec, i);
+    printf("\t%d : %ld\n", i, v);
+  }
+  printf("]\n");
 }
