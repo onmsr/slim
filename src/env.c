@@ -203,6 +203,8 @@ void env_init()
 
   lmn_env.hash_compaction        = FALSE;
   lmn_env.hash_depth             = 2;
+  lmn_env.enable_heuristics      = FALSE;
+  
 #ifdef PROFILE
   lmn_env.optimize_hash_old      = FALSE;
   lmn_env.prof_no_memeq          = FALSE;

@@ -56,6 +56,7 @@
 #include "ccallback.h"
 #include "special_atom.h"
 #include "slim_header/string.h"
+#include "heuristics.h"
 #include "slim_header/port.h"
 #include "dumper.h"
 #include "jni_lmntal.h"
@@ -352,6 +353,7 @@ static void parse_options(int *optid, int argc, char *argv[])
       break;
     case 1414:
       lmn_env.hil_file = optarg;
+      lmn_env.enable_heuristics = TRUE;
       break;
     case 1419:
       lmn_env.enable_por_old = TRUE;
@@ -720,6 +722,11 @@ int main(int argc, char *argv[])
 {
   int optid;
   slim_init(&optid, argc, argv);
+
+  /* load hil file */
+  if (lmn_env.enable_heuristics) {
+    load_hil_file(lmn_env.hil_file, &hil);
+  }
 
   if (lmn_env.run_test) {
 #ifdef USE_CUNIT
