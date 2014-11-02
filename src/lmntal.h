@@ -241,7 +241,7 @@ enum SPdumpFormat { SP_NONE, INCREMENTAL, LMN_SYNTAX};
 enum OptimizeMode { OPT_NONE, OPT_MINIMIZE, OPT_MAXIMIZE};
 
 /* heuristic search type */
-enum HSearchType { H_ASTAR };
+enum HSearchType { H_NONE, H_ASTAR };
 
 /* Lmntal Env */
 struct LmnEnv {

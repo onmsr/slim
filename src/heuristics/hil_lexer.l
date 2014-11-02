@@ -29,7 +29,7 @@ LISTOUT "]"
 DIGIT               [0-9]
 NUMBER              {DIGIT}+
 LETTER              [a-zA-Z_]
-LITERAL             {LETTER}}+
+LITERAL             {LETTER}+
 LETTER_OR_DIGIT     {LETTER}|{DIGIT}
 WORD                {LETTER_OR_DIGIT}+
 WHITE_SPACE         [ \t]

@@ -27,19 +27,19 @@ int load_hil_file(char *file_name, HIL *hil)
   return ret;
 }
 
-int get_heuristic_h(HIL hil, State s)
-{
-  return 0;
-}
-
-
-int get_heuristic_g(HIL hil, State s)
-{
-  return 0;
-}
-
-
 int get_heuristic_f(HIL hil, State *s)
+{
+  return get_heuristic_g(hil, s) + get_heuristic_h(hil, s);
+}
+
+
+int get_heuristic_g(HIL hil, State *s)
+{
+  return 0;
+}
+
+
+int get_heuristic_h(HIL hil, State *s)
 {
   /* printf("\n------------------ dump hil start ----------------------\n"); */
   /* dump_hil(hil); */
@@ -130,7 +130,7 @@ int get_heuristic_f(HIL hil, State *s)
         get_hreg(hil, get_register_index(val_or_regvar))-1 : atoi(val_or_regvar)-1;
       if (pos < 0) {
         pos = 0;
-        /* fprintf(stderr, "heuristic function [GET] : get link number is ilegal.."); */
+        /* fprintf(stderr, "heuristic function [GET] : get link number is ilegal."); */
         /* exit(1); */
       }
 
