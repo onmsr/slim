@@ -38,6 +38,7 @@
  */
 
 #include "mc.h"
+#include "mc_generator.h"
 #include "mc_worker.h"
 #include "mhash.h"
 #include "task.h"
@@ -260,6 +261,203 @@ void mc_expand(const StateSpace ss,
     profile_total_space_update(ss);
   }
 #endif
+}
+
+void mc_hs_expand(const StateSpace ss,
+               State            *s,
+               AutomataState    p_s,
+               LmnReactCxt      *rc,
+               Vector           *new_ss,
+               Vector           *psyms,
+               BOOL             f,
+               HIL              lhil,
+               LmnWorker        *w)
+{
+  LmnMembrane *mem;
+
+  /** restore : 膜の復元 */
+  mem = state_restore_mem(s);
+
+  /** expand  : 状態の展開 */
+  if (p_s) {
+    mc_gen_successors_with_property(s, mem, p_s, rc, psyms, f);
+  } else {
+    mc_gen_successors(s, mem, DEFAULT_STATE_ID, rc, f);
+  }
+
+  if (mc_react_cxt_expanded_num(rc) == 0) {
+    /* sを最終状態集合として記録 */
+    statespace_add_end_state(ss, s);
+  }
+  else if (mc_enable_por(f) && !s_is_reduced(s)) {
+    /* POR: 遷移先状態集合:en(s)からample(s)を計算する.
+     * 呼び出し先で, mc_store_successorsに相当する処理を済ませる */
+    dpor_start(ss, s, rc, new_ss, f);
+  }
+  else {
+    /* sのサクセッサを状態空間ssに記録 */
+    mc_hs_store_successors(ss, s, rc, new_ss, f, lhil, w);
+  }
+
+  if (!state_mem(s)) {
+    /** free   : 遷移先を求めた状態sからLMNtalプロセスを開放 */
+#ifdef PROFILE
+    if (lmn_env.profile_level >= 3) {
+      profile_add_space(PROFILE_SPACE__REDUCED_MEMSET, lmn_mem_space(mem));
+    }
+#endif
+    lmn_mem_free_rec(mem);
+    if (is_binstr_user(s) && lmn_env.hash_compaction) {
+      state_free_binstr(s);
+    }
+  }
+
+  /* この時点で, sのサクセッサ登録が全て完了->フラグセット
+   * (フラグがセットされた状態が, 受理サイクル探索の対象となるので,
+   *  フラグセットのタイミングは重要.) */
+
+  set_expanded(s);
+  RC_CLEAR_DATA(rc);
+
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3) {
+    profile_total_space_update(ss);
+  }
+#endif
+}
+
+/** 生成した各Successor Stateが既出か否かを検査し, 遷移元の状態sのサクセッサに設定する.
+ *   + 多重辺を除去する.
+ *   + "新規"状態をnew_ssへ積む.　 */
+void mc_hs_store_successors(const StateSpace ss,
+                         State            *s,
+                         LmnReactCxt      *rc,
+                         Vector           *new_ss,
+                         BOOL             f,
+                         HIL              lhil,
+                         LmnWorker        *w)
+{
+  unsigned int i, succ_i;
+
+  /** 状態登録 */
+  succ_i = 0;
+  for (i = 0; i < mc_react_cxt_expanded_num(rc); i++) {
+    Transition src_t;
+    st_data_t tmp;
+    State *src_succ, *succ;
+    LmnMembrane *src_succ_m;
+
+    /* 状態sのi番目の遷移src_tと遷移先状態src_succを取得 */
+    if (!has_trans_obj(s)) {
+      /* Transitionオブジェクトを利用しない場合 */
+      src_t    = NULL;
+      src_succ = (State *)vec_get(RC_EXPANDED(rc), i);
+    } else {
+      src_t    = (Transition)vec_get(RC_EXPANDED(rc), i);
+      src_succ = transition_next_state(src_t);
+    }
+
+    if (RC_MC_USE_D(rc) && RC_D_COND(rc)) {
+      /* delta-stringフラグをこの時点で初めて立てる */
+      s_set_d(src_succ);
+    }
+
+    /* 状態空間に状態src_succを記録 */
+    if (RC_MC_USE_DMEM(rc)) {           /* --delta-mem */
+      MemDeltaRoot *d = (struct MemDeltaRoot *)vec_get(RC_MEM_DELTAS(rc), i);
+      succ       = statespace_insert_delta(ss, src_succ, d);
+      src_succ_m = NULL;
+    }
+    else if (is_encoded(src_succ)) {    /* !--delta-mem && --mem-enc */
+      if (s_is_d(src_succ)) state_calc_binstr_delta(src_succ);
+      succ       = statespace_insert(ss, src_succ);
+      src_succ_m = NULL;
+    }
+    else { /* default */
+      src_succ_m = state_mem(src_succ); /* for free mem pointed by src_succ */
+      succ       = statespace_insert(ss, src_succ);
+    }
+
+
+    // calculate heuristic values
+    if (lmn_env.enable_heuristics) {
+      src_succ->h = get_heuristic_h(lhil, src_succ, src_succ_m);
+      src_succ->g = s->g + 1;
+      src_succ->f = src_succ->g + src_succ->h;
+    }
+    
+    if (succ == src_succ) {
+      /* new state */
+      state_id_issue(succ);
+      if (mc_use_compress(f) && src_succ_m) {
+        lmn_mem_free_rec(src_succ_m);
+      }
+      if (new_ss)        vec_push(new_ss, (vec_data_t)succ);
+      if (mc_is_dump(f)) dump_state_data(succ, (LmnWord)stdout, (LmnWord)NULL);
+    }
+    else {
+      /* contains */
+      if (lmn_env.enable_heuristics) {
+        if (src_succ->f < succ->f) {
+          // キューからノードを削除
+          if (!linear_pq_remove_node(HS_WORKER_Q_CUR(w), (LmnWord) succ, succ->f)) {
+            linear_pq_remove_node(HS_WORKER_Q_CLOSED(w), (LmnWord) succ, succ->f);
+          }
+          // 新しい状態のほうがよい評価値をもつので、各値と展開元を修正してもう一度オープンキューに追加
+          succ->f = src_succ->f;
+          succ->g = src_succ->g;
+          succ->parent = src_succ->parent;
+          if (new_ss) vec_push(new_ss, (vec_data_t)succ);
+        }
+      }
+      
+      state_free(src_succ);
+      if (has_trans_obj(s)) {
+        /* Transitionオブジェクトが指すサクセッサを検出した等価な状態の方へ設定し直す */
+        transition_set_state(src_t, succ);
+      }
+    }
+
+    /* 多重辺(1stepで合流する遷移関係)を除去 */
+    tmp = 0;
+    if (!st_lookup(RC_SUCC_TBL(rc), (st_data_t)succ, (st_data_t *)&tmp)) {
+      /* succへの遷移が多重辺ではない場合 */
+      st_data_t ins;
+      if (has_trans_obj(s)) {
+        ins = (st_data_t)src_t;
+      } else {
+        ins = (st_data_t)succ;
+      }
+      /* 状態succをサクセッサテーブルへ記録(succをkeyにして, succに対応する遷移insを登録) */
+      st_add_direct(RC_SUCC_TBL(rc), (st_data_t)succ, ins);
+      /* 遷移先情報を記録する一時領域(in ReactCxt)を更新 */
+      vec_set(RC_EXPANDED(rc), succ_i++, ins);
+    }
+    else if (has_trans_obj(s)) {
+      /* succへの遷移が多重辺かつTransitionオブジェクトを利用する場合 */
+      /* src_tは状態生成時に張り付けたルール名なので, 0番にしか要素はないはず */
+      transition_add_rule((Transition)tmp,
+                          transition_rule(src_t, 0),
+                          transition_cost(src_t));
+      transition_free(src_t);
+    } /*
+    else succへの遷移が多重辺かつTransitionオブジェクトを利用しない場合
+         then "辺"という構造を持たない(直接pointerで刺している)ので何もしない
+    */
+  }
+
+  st_clear(RC_SUCC_TBL(rc));
+
+  RC_EXPANDED(rc)->num = succ_i;      /* 危険なコード. いつか直すかも. */
+  RC_EXPANDED_RULES(rc)->num = succ_i;
+/*  上記につられて以下のコードを記述すると実行時エラーになる. (r436でdebug)
+ *  RC_MEM_DELTASはmc_store_successors終了後に, struct MemDeltaRootの開放処理を行うため要素数に手を加えてはならない. */
+//  if (RC_MC_USE_DMEM(rc)) {
+//    RC_MEM_DELTAS(rc)->num = succ_i;
+//  }
+
+  state_D_progress(s, rc);
+  state_succ_set(s, RC_EXPANDED(rc)); /* successorを登録 */
 }
 
 

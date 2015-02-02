@@ -727,11 +727,6 @@ int main(int argc, char *argv[])
   int optid;
   slim_init(&optid, argc, argv);
 
-  /* load hil file */
-  if (lmn_env.enable_heuristics) {
-    load_hil_file(lmn_env.hil_file, &hil);
-  }
-
   if (lmn_env.run_test) {
 #ifdef USE_CUNIT
     test_main();
@@ -753,6 +748,15 @@ int main(int argc, char *argv[])
     Vector *start_rulesets = vec_make(2);
 
     if (load_input_files(start_rulesets, optid, argc, argv)) {
+
+      if (lmn_env.enable_heuristics) { // for heuristics search 
+        load_hil_file(lmn_env.hil_file, &hil);
+        init_functors_table();
+        hil_init_symbol(hil);
+        /* print_functors_table(); */
+        /* dump_hil(hil); */
+      }
+      
       if (lmn_env.translate) { /** lmntalコードからCへの変換実行の場合 */
         /* TODO: 複数ファイル入力への対応 */
         translate(strcmp("-", argv[optid]) ? argv[optid] : NULL);

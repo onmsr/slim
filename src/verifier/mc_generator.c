@@ -1076,3 +1076,204 @@ static inline void bfs_loop(LmnWorker *w, Vector *new_ss, Automata a, Vector *ps
     vec_clear(new_ss);
   }
 }
+
+/** -----------------------------------------------------------
+ *  Heuristic Search
+ */
+
+static inline void hs_astar_loop(LmnWorker *w, Vector *new_states, Automata a, Vector *psyms);
+  
+/* LmnWorker wにBFSのためのデータを割り当てる */
+void hs_astar_worker_init(LmnWorker *w)
+{
+  McExpandHS *mc = LMN_MALLOC(McExpandHS);
+
+  if (!worker_on_parallel(w)) {
+    mc->cur = linear_pq_make(128);
+    mc->closed = linear_pq_make(128);
+    mc->local_hil = hil;
+  }
+  /* MT */
+  else if (worker_id(w) == 0) {
+    mc->cur = linear_parallel_pq_make(128);
+    mc->closed = linear_parallel_pq_make(128);
+    mc->local_hil = hil;
+  } else {
+    mc->cur = HS_WORKER_Q_CUR(workers_get_worker(worker_group(w), 0));
+    mc->closed = HS_WORKER_Q_CLOSED(workers_get_worker(worker_group(w), 0));
+    mc->local_hil = hil_local_make(hil);
+  }
+
+  HS_WORKER_OBJ_SET(w, mc);
+}
+
+/* LmnWorkerのBFS固有データを破棄する */
+void hs_astar_worker_finalize(LmnWorker *w)
+{
+  McExpandHS *mc = (McExpandHS *)HS_WORKER_OBJ(w);
+  if (!worker_on_parallel(w)) {
+    linear_pq_free(mc->cur);
+    linear_pq_free(mc->closed);
+  } else if (worker_id(w) == 0){
+    linear_pq_free(mc->cur);
+    linear_pq_free(mc->closed);
+  } else {
+    // @TODO free hil
+  }
+  LMN_FREE(mc);
+}
+
+
+/* BFS Queueが空の場合に真を返す */
+BOOL hs_worker_check(LmnWorker *w)
+{
+  return linear_pq_is_empty(HS_WORKER_Q_CUR(w));
+}
+
+/* Workerにheuristic search(A*探索)を割り当てる */
+void hs_astar_env_set(LmnWorker *w)
+{
+  worker_set_mc_bfs(w);
+  w->start    = hs_astar_start;
+  w->check    = hs_worker_check;
+  worker_generator_init_f_set(w, hs_astar_worker_init);
+  worker_generator_finalize_f_set(w, hs_astar_worker_finalize);
+}
+
+
+/* 幅優先探索で状態空間を構築する */
+void hs_astar_start(LmnWorker *w)
+{
+  LmnWorkerGroup *wp;
+  unsigned long d_lim;
+  Vector *new_ss;
+  StateSpace ss;
+
+  ss = worker_states(w);
+  wp = worker_group(w);
+  d_lim = lmn_env.depth_limits;
+  new_ss = vec_make(32);
+
+  if (!worker_on_parallel(w) || worker_id(w) == 0) { /* 重複して初期状態をenqしないようにするための条件 */
+    // 初期状態の評価値を計算
+    State *ts = statespace_init_state(ss);
+    ts->h = get_heuristic_h(HS_WORKER_HIL(w), ts, NULL);
+    ts->f = ts->g + ts->h;
+    
+    linear_pq_enqueue(HS_WORKER_Q_CUR(w),(LmnWord)statespace_init_state(ss), ts->f);
+  }
+
+  /* start heuristic  */
+  if (!worker_on_parallel(w)) {
+    /** >>>> 逐次 >>>> */
+    while (!wp->mc_exit) {
+      hs_astar_loop(w, new_ss, statespace_automata(ss), statespace_propsyms(ss));
+      break;
+    }
+  }
+  else if (TRUE) {
+    /** >>>> 並列(グローバルキュー利用) >>>> */
+    while (!wp->mc_exit) {
+      if (!linear_pq_is_empty(HS_WORKER_Q_CUR(w))) {
+        EXECUTE_PROFILE_START();
+        worker_set_active(w);
+        hs_astar_loop(w, new_ss, statespace_automata(ss), statespace_propsyms(ss));
+        worker_set_idle(w);
+        /* vec_clear(new_ss); */
+        EXECUTE_PROFILE_FINISH();
+      } else {
+        worker_set_idle(w);
+        if (lmn_workers_termination_detection_for_rings(w)) {
+          break;
+        }
+      }
+    }
+  } else {
+    // @not implemented
+    /** >>>> 並列(ローカルキュー利用) >>>> */
+    // 自分のキューに未展開状態がなくなったら他のワーカーから取得する
+    /*   worker_set_idle(w); */
+    /*   while (TRUE) { */
+    /*     if (!linear_pq_is_empty(HS_WORKER_Q_CUR(w))) { */
+    /*       /\**\/EXECUTE_PROFILE_START(); */
+    /*       worker_set_active(w); */
+    /*       hs_astar_loop(w, new_ss, statespace_automata(ss), statespace_propsyms(ss)); */
+    /*       worker_set_idle(w); */
+    /*       /\* vec_clear(new_ss); *\/ */
+    /*       /\**\/EXECUTE_PROFILE_FINISH(); */
+    /*     } */
+    /*     if (BLEDGE_COND(w)) bledge_start(w); */
+    /*     // check work stealing */
+    /*     /\* lmn_workers_synchronization(w, (void *)lmn_workers_termination_detection_for_rings); *\/ */
+    /*     if (wp->mc_exit || lmn_workers_termination_detection_for_rings(w)) { */
+    /*       break; */
+    /*     } */
+    /*   } */
+    }
+    vec_free(new_ss);
+}
+
+static inline void hs_astar_loop(LmnWorker *w, Vector *new_ss, Automata a, Vector *psyms)
+{
+  LmnWorkerGroup *wp = worker_group(w);
+  while (!linear_pq_is_empty(HS_WORKER_Q_CUR(w))) {
+    State *s;
+    AutomataState p_s;
+    
+    if (workers_are_exit(wp)) return;
+    
+    // キューから取り出す
+    s = (State *) linear_pq_dequeue(HS_WORKER_Q_CUR(w));
+
+    if (!s || s == EMPTY_KEY) return; /* dequeueはNULLを返すことがある */
+
+    if (s->h == 0) {
+      // パスを出力
+      State *ts = s;
+      Vector *path = vec_make(32);
+      while(ts) {
+        vec_push(path, (LmnWord) ts);
+        ts = ts->parent;
+      }
+
+      printf("\n----------------- path to goal -----------------------\n");
+      unsigned int i = 0;
+      while(path->num != 0) {
+        ts = (State *) vec_pop(path);
+        printf("%u\t: ", i++);
+        lmn_dump_cell_stdout(state_restore_mem(ts));
+      }
+      printf("\n-------------------------------------------------------\n");
+      vec_free(path);
+      // パスを出力 end
+      
+      workers_set_exit(wp);
+      return;
+    }
+
+    p_s = MC_GET_PROPERTY(s, a);
+    if (is_expanded(s)) {
+      continue;
+    } else if (!worker_ltl_none(w) && atmstate_is_end(p_s)) { /* safety property analysis */
+      mc_found_invalid_state(wp, s);
+      continue;
+    }
+
+    // 状態展開
+    mc_hs_expand(worker_states(w), s, p_s, &worker_rc(w), new_ss, psyms, worker_flags(w), HS_WORKER_HIL(w), w);
+
+    // 展開した状態をclosedキューに追加
+    linear_pq_enqueue(HS_WORKER_Q_CLOSED(w), (LmnWord) s, s->f);
+    
+    // キューへの追加
+    State *ts;
+    unsigned int i;
+    for (i = 0; i < vec_num(new_ss); i++) {
+      ts = (State *) vec_get(new_ss, i);
+      linear_pq_enqueue(HS_WORKER_Q_CUR(w), (LmnWord) ts, ts->f);
+    }
+    
+    vec_clear(new_ss);
+  }
+  
+}

@@ -47,6 +47,7 @@
 #include "state.h"
 #include "statespace.h"
 #include "mc_worker.h"
+#include "heuristics.h"
 
 
 #ifdef DEBUG
@@ -79,6 +80,23 @@ void mc_expand(const StateSpace states,
                Vector           *new_s,
                Vector           *psyms,
                BOOL             flag);
+void mc_hs_expand(const StateSpace ss,
+               State            *s,
+               AutomataState    p_s,
+               LmnReactCxt      *rc,
+               Vector           *new_ss,
+               Vector           *psyms,
+               BOOL             f,
+               HIL              lhil,
+               LmnWorker        *w);
+void mc_hs_store_successors(const StateSpace ss,
+                         State            *s,
+                         LmnReactCxt      *rc,
+                         Vector           *new_ss,
+                         BOOL             f,
+                         HIL              lhil,
+                         LmnWorker        *w);
+
 void mc_update_cost(State *s, Vector *new_ss, EWLock *ewlock);
 void mc_gen_successors_with_property(State         *s,
                                      LmnMembrane   *mem,

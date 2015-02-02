@@ -1,6 +1,12 @@
 /* heuristics.c */
 
 #include "heuristics.h"
+#include "hil_lexer.h"
+#include "hil_parser.h"
+
+#ifdef PROFILE
+#  include "runtime_status.h"
+#endif
 
 static int hil_parse(FILE *in, HIL *hil)
 {
@@ -27,36 +33,29 @@ int load_hil_file(char *file_name, HIL *hil)
   return ret;
 }
 
-int get_heuristic_f(HIL hil, State *s)
-{
-  return get_heuristic_g(hil, s) + get_heuristic_h(hil, s);
-}
-
-
 int get_heuristic_g(HIL hil, State *s)
 {
-  return 0;
+  return s->g;
 }
 
 
-int get_heuristic_h(HIL hil, State *s)
+int get_heuristic_h(HIL hil, State *s, LmnMembrane *mem)
 {
-  /* printf("\n------------------ dump hil start ----------------------\n"); */
-  /* dump_hil(hil); */
-  /* printf("\n------------------ dump hil end ----------------------\n"); */
-  
-  LmnMembrane *mem = state_restore_mem(s);
-  
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3) {
+    profile_start_timer(PROFILE_TIME__CALC_HEURISTIC_FUNC);
+  }
+#endif
+
+  if (mem == NULL) {
+    mem = state_restore_mem(s); 
+  }
+
   unsigned int i, n = vec_num(hil->instrs);
   for (i = 0; i < n; i++) {
     HInstruction instr = (HInstruction) vec_get(hil->instrs, i);
     HArgList hargs = LMN_GET_HINSTR_ARGS(instr);
     unsigned int dest = get_hdest(instr);
-    /* printf("\n----------------------------------------\n"); */
-    /* dump_hinstr(instr); */
-    /* printf("\n------------------instr before reg dump start----------------------\n"); */
-    /* if (LMN_IS_HREGISTER_INITED(hil)) dump_hregs(hil); */
-    /* printf("\n------------------instr before reg dump end----------------------\n"); */
 
     switch (instr->id) {
     case HINSTR_INIT:
@@ -87,7 +86,6 @@ int get_heuristic_h(HIL hil, State *s)
       unsigned int regn1 = get_register_index((char *) LMN_GET_HARG(arg1));
       unsigned int regn2 = get_register_index((char *) LMN_GET_HARG(arg2));
       LmnWord res = (LmnWord) (((long) get_hreg(hil, regn1)) - ((long) get_hreg(hil, regn2))); 
-      /* printf("sub result : %ld - %ld = %ld\n", get_hreg(hil, regn1), get_hreg(hil, regn2), res); */
       set_hreg(hil, dest, res);
       break;
     }
@@ -114,8 +112,8 @@ int get_heuristic_h(HIL hil, State *s)
     case HINSTR_STORE:
     {
       HArgument arg = (HArgument) vec_get(hargs, 0);
-      unsigned int regn = get_register_index((char *) LMN_GET_HARG(arg));
-      LmnWord res = get_hreg(hil, regn);
+      char *val_or_regvar = (char *) LMN_GET_HARG(arg);
+      LmnWord res = (is_register_variable(val_or_regvar)) ? get_hreg(hil, get_register_index(val_or_regvar)) : atoi(val_or_regvar);
       set_hreg(hil, dest, res);
       break;
     }
@@ -124,29 +122,26 @@ int get_heuristic_h(HIL hil, State *s)
       // get instruction arguments
       HArgument arg1 = (HArgument) vec_get(hargs, 0);
       HArgument arg2 = (HArgument) vec_get(hargs, 1);
-      char *atname = (char *) LMN_GET_HARG(arg1);
+
+      unsigned int id = (unsigned int) LMN_GET_HARG(arg1);
       char *val_or_regvar = (char *) LMN_GET_HARG(arg2);
       int pos = (is_register_variable(val_or_regvar)) ?
         get_hreg(hil, get_register_index(val_or_regvar))-1 : atoi(val_or_regvar)-1;
       if (pos < 0) {
-        pos = 0;
-        /* fprintf(stderr, "heuristic function [GET] : get link number is ilegal."); */
-        /* exit(1); */
+        fprintf(stderr, "heuristic function [GET] : get link number is ilegal.");
+        exit(1);
       }
 
       // functors
-      Vector *fs = get_functors_by_atname(atname);
+      Vector *fs = get_functors(id);
 
-      unsigned int i, n = vec_num(fs);
-      for (i = 0; i < n; i++) {
-        LmnFunctor f = (LmnFunctor) vec_get(fs, i);
+      unsigned int j, n = vec_num(fs);
+      for (j = 0; j < n; j++) {
+        LmnFunctor f = (LmnFunctor) vec_get(fs, j);
         
         LmnSAtom atom;
         EACH_FUNC_ATOM(mem, f, atom, ({
               if (atom != NULL) {
-                /* printf("\n----------------------------------------\n"); */
-                /* dump_atom_dev(atom); */
-                /* printf("\n----------------------------------------\n"); */
                 LmnLinkAttr attr = LMN_SATOM_GET_ATTR(atom, pos);
                 if (LMN_ATTR_IS_DATA(attr)) {
                   unsigned int val = LMN_SATOM_GET_LINK(atom, pos);
@@ -155,12 +150,10 @@ int get_heuristic_h(HIL hil, State *s)
                   fprintf(stderr, "heuristic function [GET] : atom attr error.");
                   exit(1);
                 }
-                
                 break;
               }
             }));
       }
-      vec_clear(fs);
       
       break;
     }
@@ -172,6 +165,58 @@ int get_heuristic_h(HIL hil, State *s)
       set_hreg(hil, dest, res);
       break;
     }
+    case HINSTR_EQ:
+    {
+      HArgument arg1 = (HArgument) vec_get(hargs, 0);
+      HArgument arg2 = (HArgument) vec_get(hargs, 1);
+      char *val_or_regvar1 = (char *) LMN_GET_HARG(arg1);
+      char *val_or_regvar2 = (char *) LMN_GET_HARG(arg2);
+      int val1 = (is_register_variable(val_or_regvar1)) ? get_hreg(hil, get_register_index(val_or_regvar1)) : atoi(val_or_regvar1);
+      int val2 = (is_register_variable(val_or_regvar2)) ? get_hreg(hil, get_register_index(val_or_regvar2)) : atoi(val_or_regvar2);
+      LmnWord res = (val1 == val2);
+      set_hreg(hil, dest, res);
+      break;
+    }
+    case HINSTR_NOT:
+    {
+      HArgument arg1 = (HArgument) vec_get(hargs, 0);
+      char *val_or_regvar1 = (char *) LMN_GET_HARG(arg1);
+      int val1 = (is_register_variable(val_or_regvar1)) ? get_hreg(hil, get_register_index(val_or_regvar1)) : atoi(val_or_regvar1);
+      LmnWord res = (!val1);
+      set_hreg(hil, dest, res);
+      break;
+    }
+    case HINSTR_AND:
+    {
+      // @not implemented
+      break;
+    }
+    case HINSTR_OR:
+    {
+      // @not implemented
+      break;
+    }
+    case HINSTR_BR:
+    {
+      HArgument arg1 = (HArgument) vec_get(hargs, 0);
+      char *label = (char *) LMN_GET_HARG(arg1);
+      i = get_hlabel_pos(hil, label)-1;
+      set_hreg(hil, dest, 1);
+      break;
+    }
+    case HINSTR_BRT:
+    {
+      HArgument arg1 = (HArgument) vec_get(hargs, 0);
+      HArgument arg2 = (HArgument) vec_get(hargs, 1);
+      char *label = (char *) LMN_GET_HARG(arg1);
+      char *val_or_regvar = (char *) LMN_GET_HARG(arg2);
+      int cond = (is_register_variable(val_or_regvar)) ? get_hreg(hil, get_register_index(val_or_regvar)) : atoi(val_or_regvar);
+      if (cond != 0) {
+        i = get_hlabel_pos(hil, label)-1;
+      }
+      set_hreg(hil, dest, (cond != 0));
+      break;
+    }
     case HINSTR_DUMMY:
     {
       break;
@@ -180,14 +225,14 @@ int get_heuristic_h(HIL hil, State *s)
       fprintf(stderr, "heuristic function: Unknown heuristic instruction %d\n", instr->id);
       exit(1);
     }
-    /* printf("\n------------------instr after reg dump start----------------------\n"); */
-    /* dump_hregs(hil); */
-    /* printf("\n------------------instr after reg dump end----------------------\n"); */
   }
-  /* printf("\n------------------reg dump start----------------------\n"); */
-  /* dump_hregs(hil); */
-  /* printf("\n------------------reg dump end----------------------\n"); */
   
+#ifdef PROFILE
+  if (lmn_env.profile_level >= 3) {
+    profile_finish_timer(PROFILE_TIME__CALC_HEURISTIC_FUNC);
+  }
+#endif
+
   return (LMN_IS_HREGISTER_INITED(hil)) ? get_hreg(hil, get_hreg(hil, 0)) : 0;
 }
 
@@ -205,3 +250,5 @@ Vector *get_functors_by_atname(const char *atname)
   }
   return functors;
 }
+
+

@@ -43,6 +43,9 @@
 #include "lmntal.h"
 #include "mc_worker.h"
 #include "stack_macro.h"
+#include "heuristics.h"
+#include "hsyntax.h"
+#include "priority_queue.h"
 
 /** prototypes
  */
@@ -59,5 +62,20 @@ void bfs_start(LmnWorker *w);
 void bfs_worker_init(LmnWorker *w);
 void bfs_worker_finalize(LmnWorker *w);
 BOOL bfs_worker_check(LmnWorker *w);
+
+void hs_astar_env_set(LmnWorker *w);
+void hs_astar_start(LmnWorker *w);
+
+typedef struct McExpandHS {
+  PQueue *cur;    /* open states */
+  PQueue *closed; /* closed states */
+  HIL local_hil;  /* HIL */
+} McExpandHS;
+
+#define HS_WORKER_OBJ(W)             ((McExpandHS *)worker_generator_obj(W))
+#define HS_WORKER_OBJ_SET(W, O)      (worker_generator_obj_set(W, O))
+#define HS_WORKER_Q_CUR(W)           (HS_WORKER_OBJ(W)->cur)
+#define HS_WORKER_HIL(W)             (HS_WORKER_OBJ(W)->local_hil)
+#define HS_WORKER_Q_CLOSED(W)        (HS_WORKER_OBJ(W)->closed)
 
 #endif
