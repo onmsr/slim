@@ -3,14 +3,19 @@
 #ifndef LMN_HSYNTAX_H
 #define LMN_HSYNTAX_H
 
+#include "lmntal.h"
 #include "vector.h"
 #include "util.h"
+#include "functor.h"
+
 
 typedef Vector *HArgList;
 typedef Vector *HInstrList;
 typedef unsigned long HDest;
 typedef unsigned long HArg;
+typedef unsigned long HLabelStr;
 typedef Vector *HRegList;
+typedef Vector *HLabelList;
 
 struct HRegister {
   unsigned int size;
@@ -20,6 +25,7 @@ struct HRegister {
 struct HIL {
   HInstrList instrs;
   struct HRegister reg;
+  HLabelList labels;
 };
 
 typedef struct HIL *HIL;
@@ -33,6 +39,12 @@ enum LmnHInstruction {
   HINSTR_STORE,
   HINSTR_GET,
   HINSTR_ABS,
+  HINSTR_EQ,
+  HINSTR_NOT,
+  HINSTR_AND,
+  HINSTR_OR,
+  HINSTR_BR,
+  HINSTR_BRT,
   HINSTR_DUMMY
 };
 
@@ -51,6 +63,12 @@ struct HInstruction {
 };
 
 typedef struct HInstruction *HInstruction;
+
+struct HLabel {
+  HLabelStr label;
+  unsigned int pos;
+};
+typedef struct HLabel *HLabel;
 
 /* HInstruction */
 
@@ -77,9 +95,9 @@ HArgList harg_list_make();
 void harg_list_push(HArgList args, HArgument arg);
 
 /* HDest */
-BOOL is_register_variable(char *s);
-unsigned int get_register_index(char *s);
-unsigned int get_hdest(HInstruction instr);
+static inline BOOL is_register_variable(char *s);
+static inline unsigned int get_register_index(char *s);
+static inline unsigned int get_hdest(HInstruction instr);
 
 /* HInstrList */
 HInstrList hinstr_list_make();
@@ -92,8 +110,8 @@ void hinstr_list_push(HInstrList instrs, HInstruction instr);
 #define LMN_SET_HREGLIST(REG, REGS) (REG).registers = REGS
 
 /* HRegList */
-LmnWord get_hreg(HIL hil, unsigned int n);
-void set_hreg(HIL hil, unsigned int n, LmnWord v);
+static inline LmnWord get_hreg(HIL hil, unsigned int n);
+static inline void set_hreg(HIL hil, unsigned int n, LmnWord v);
 
 /* HIL */
 #define LMN_GET_HINSTRS(HIL) (HIL)->instrs
@@ -104,19 +122,105 @@ void set_hreg(HIL hil, unsigned int n, LmnWord v);
 #define LMN_GET_HREGS(HIL) (LMN_GET_HREGLIST(LMN_GET_HREGISTER(HIL)))
 #define LMN_SET_HREGS(HIL, REGS) (LMN_GET_HREGS(HIL) = REGS)
 
-HIL hil_make(HInstrList instrs);
+HIL hil_make(HInstrList instrs, HLabelList labels);
+HIL hil_local_make(HIL ghil);
 void hil_init_hregs(HIL hil, unsigned int size);
+void hil_init_symbol();
 
+/* HLabel */
+HLabel hlabel_make(HLabelStr label, unsigned long pos);
+void hlabel_free(HLabel label);
 
+/* HLabelList */
+HLabelList hlabel_list_make();
+void hlabel_list_push(HLabelList labels, HLabel label);
+static inline unsigned int get_hlabel_pos(HIL hil, char *label);
+  
 /* dumper */
 void dump_hil(HIL hil);
 void dump_hinstr_list(HInstrList l);
 void dump_hinstr(HInstruction i);
-void dump_harg_list(HArgList al);
-void dump_harg(HArgument arg);
 char *get_hinstr_by_id(enum LmnHInstruction id);
 unsigned int get_hinstr_id(char *s);
 void dump_hregs(HIL hil);
+
+
+/* functors table */
+
+#define EMPTY_FUNCTOR_KEY   0xffffffffU
+
+typedef struct FunctorsTable FunctorsTable;
+typedef struct FunctorsEntry FunctorsEntry;
+
+struct FunctorsTable {
+  unsigned int size;
+  Vector *entries;
+};
+
+struct FunctorsEntry {
+  unsigned int id;
+  lmn_interned_str nameid;
+  Vector *functors;
+};
+
+FunctorsTable *fs_tbl;
+
+void init_functors_table();
+FunctorsEntry *make_functors_entry();
+void put_functor(LmnFunctor f);
+unsigned int find_functor_id(LmnFunctor f);
+unsigned int find_functor_id_by_name(char *atname);
+FunctorsEntry *get_functors_entry(unsigned int id);
+Vector *get_functors(unsigned int id);
+const char *get_functor_name(unsigned int id);
+void print_functors_table();
+
+
+/* HDest */
+
+static inline BOOL is_register_variable(char *s)
+{
+  char *ret = strchr(s, 'T');
+  return (ret != NULL) ? TRUE : FALSE;
+}
+
+static inline unsigned int get_register_index(char *s)
+{
+  return atoi(++s);
+}
+
+static inline unsigned int get_hdest(HInstruction instr)
+{
+  return get_register_index((char *) LMN_GET_HINSTR_DEST(instr));
+}
+
+/* HRegList */
+
+static inline LmnWord get_hreg(HIL hil, unsigned int n)
+{
+  return vec_get(LMN_GET_HREGS(hil), n);
+}
+
+static inline void set_hreg(HIL hil, unsigned int n, LmnWord v)
+{
+  vec_set(LMN_GET_HREGS(hil), n, v);
+}
+
+
+/* HLabelList */
+static inline unsigned int get_hlabel_pos(HIL hil, char *label)
+{
+  HLabel l;
+  unsigned int i, n = vec_num(hil->labels);
+  for (i = 0; i < n; i++) {
+    l = (HLabel) vec_get(hil->labels, i);
+    if (strcmp((char *) l->label, label) == 0) {
+      return l->pos;
+    }
+  }
+  // do not reach this line.
+  return 0;
+}
 
 #endif // LMN_HSYNTAX_H
 

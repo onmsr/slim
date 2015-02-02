@@ -115,6 +115,10 @@ State *state_make_minimal()
   }
 #endif
 
+  new_s->h                = 0;
+  new_s->g                = 0;
+  new_s->f                = 0;
+  
 #ifdef PROFILE
   if (lmn_env.profile_level >= 3) {
     profile_add_space(PROFILE_SPACE__STATE_OBJECT, sizeof(struct State));

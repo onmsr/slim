@@ -90,6 +90,10 @@ struct State {                 /* Total:64(36)byte */
 #ifdef KWBT_OPT
   LmnCost            cost;            /*  8(4)byte: cost */
 #endif
+  /* heuristic estimates */
+  unsigned int       h;               /* 4byte: expected cost form current to goal */
+  unsigned int       g;               /* 4byte: real cost from start to current  */
+  unsigned int       f;               /* 4byte: expected cost from start to goal(f = g + h) */
 };
 
 #define state_flags(S)                 ((S)->flags)
@@ -234,7 +238,7 @@ struct State {                 /* Total:64(36)byte */
 
 #define STATE_FRESH_MASK             (0x01U)
 
-/* manipulation for flags2 */
+/* manipulation for flags3 */
 #define s_set_fresh(S)                     ((S)->flags3 |=   STATE_FRESH_MASK)
 #define s_unset_fresh(S)                   ((S)->flags3 &= (~STATE_FRESH_MASK))
 #define s_is_fresh(S)                      ((S)->flags3 &    STATE_FRESH_MASK)

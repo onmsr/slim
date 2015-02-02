@@ -555,7 +555,9 @@ static void worker_set_env(LmnWorker *w)
   if (lmn_env.enable_parallel)        worker_set_parallel(w);
   if (lmn_env.optimize_loadbalancing) worker_set_dynamic_lb(w);
 
-  if (!lmn_env.bfs) { /* Depth First Search */
+  if (lmn_env.hstype == H_ASTAR) {
+    hs_astar_env_set(w);
+  } else if (!lmn_env.bfs) { /* Depth First Search */
     dfs_env_set(w);
   } else {            /* Breadth First Search */
     bfs_env_set(w);

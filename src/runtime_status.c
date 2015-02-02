@@ -888,6 +888,9 @@ static char *profile_time_id_to_name(int type)
   case PROFILE_TIME__REPAIR:
     ret = "repair phase";
     break;
+  case PROFILE_TIME__CALC_HEURISTIC_FUNC:
+    ret = "eval heuristic func";
+    break;
   default:
     ret = "unknown";
     break;

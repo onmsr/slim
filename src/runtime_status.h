@@ -94,6 +94,7 @@ enum PROFILE_TIME {
   PROFILE_TIME__COST_UPDATE,                  /* 最適化実行 */
   PROFILE_TIME__LOCK,                         /* ロックされている時間 */
   PROFILE_TIME__REPAIR,                       /* (MCNDFS)Red DFSのRepair Phaseの時間 */
+  PROFILE_TIME__CALC_HEURISTIC_FUNC,          /* ヒューリスティック関数の計算 */
   PTIME_TAIL,                         /* dummy */
 };
 

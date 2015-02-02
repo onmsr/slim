@@ -3,6 +3,7 @@ noinst_LIBRARIES = liblmn_utility.a
 liblmn_utility_a_CFLAGS = \
         -I../             \
         -I../verifier     \
+        -I../heuristics     \
         $(CFLAGS)
 
 liblmn_utility_a_SOURCES =       \
@@ -14,6 +15,7 @@ liblmn_utility_a_SOURCES =       \
 	util.c          util.h         \
 	internal_hash.c internal_hash.h\
 	visitlog.c      visitlog.h     \
-	lmntal_thread.c lmntal_thread.h
+	lmntal_thread.c lmntal_thread.h\
+	priority_queue.c priority_queue.h
 
 
