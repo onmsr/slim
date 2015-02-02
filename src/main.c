@@ -624,6 +624,10 @@ static inline void slim_init(int *optid, int argc, char **argv)
   for (i = lmn_env.load_path_num - 1; i >= 0; i--) {
     load_il_files(lmn_env.load_path[i]);
   }
+  
+  if (lmn_env.enable_heuristics) {
+    load_hil_file(lmn_env.hil_file, &hil);
+  }
 }
 
 static inline void slim_finalize(void)
@@ -726,7 +730,7 @@ int main(int argc, char *argv[])
 {
   int optid;
   slim_init(&optid, argc, argv);
-
+  
   if (lmn_env.run_test) {
 #ifdef USE_CUNIT
     test_main();
@@ -749,12 +753,9 @@ int main(int argc, char *argv[])
 
     if (load_input_files(start_rulesets, optid, argc, argv)) {
 
-      if (lmn_env.enable_heuristics) { // for heuristics search 
-        load_hil_file(lmn_env.hil_file, &hil);
+      if (lmn_env.enable_heuristics) { // for heuristics search
         init_functors_table();
         hil_init_symbol(hil);
-        /* print_functors_table(); */
-        /* dump_hil(hil); */
       }
       
       if (lmn_env.translate) { /** lmntalコードからCへの変換実行の場合 */

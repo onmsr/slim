@@ -51,7 +51,8 @@ int get_heuristic_h(HIL hil, State *s, LmnMembrane *mem)
     mem = state_restore_mem(s); 
   }
 
-  unsigned int i, n = vec_num(hil->instrs);
+  int i;
+  unsigned int n = vec_num(hil->instrs);
   for (i = 0; i < n; i++) {
     HInstruction instr = (HInstruction) vec_get(hil->instrs, i);
     HArgList hargs = LMN_GET_HINSTR_ARGS(instr);
